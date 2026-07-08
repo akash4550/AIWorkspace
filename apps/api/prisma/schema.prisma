@@ -1,0 +1,534 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// -----------------------------------------------------------------------------
+// ENUMS
+// -----------------------------------------------------------------------------
+
+enum Role {
+  SUPER_ADMIN
+  ADMIN
+  MANAGER
+  EMPLOYEE
+}
+
+enum NotificationType {
+  INFO
+  WARNING
+  ERROR
+  SUCCESS
+}
+
+enum ActivityType {
+  CREATE
+  UPDATE
+  DELETE
+  LOGIN
+  LOGOUT
+}
+
+enum TaskStatus {
+  BACKLOG
+  TODO
+  IN_PROGRESS
+  IN_REVIEW
+  DONE
+}
+
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum ProjectStatus {
+  PLANNING
+  ACTIVE
+  ON_HOLD
+  COMPLETED
+  ARCHIVED
+}
+
+enum TeamRole {
+  OWNER
+  LEAD
+  MEMBER
+  VIEWER
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  EXPIRED
+}
+
+// -----------------------------------------------------------------------------
+// CORE MODELS
+// -----------------------------------------------------------------------------
+
+model Organization {
+  id        String   @id @default(uuid())
+  name      String
+  slug      String   @unique
+  logo      String?
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  // Relationships
+  users           User[]
+  teams           Team[]
+  projects        Project[]
+  clients         Client[]
+  contacts        Contact[]
+  leads           Lead[]
+  pipelineStages  PipelineStage[]
+  opportunities   Opportunity[]
+  crmActivities   CRMActivity[]
+  documents       Document[]
+  notifications   Notification[]
+  activityLogs    ActivityLog[]
+  tasks           Task[]
+  events          CalendarEvent[]
+  teamInvitations TeamInvitation[]
+  AIUsageLog      AIUsageLog[]
+
+  @@index([slug])
+}
+
+model User {
+  id             String    @id @default(uuid())
+  organizationId String
+  firstName      String
+  lastName       String
+  email          String    @unique
+  password       String
+  role           Role      @default(EMPLOYEE)
+  avatar         String?
+  isActive       Boolean   @default(true)
+  lastLogin      DateTime?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  // Relationships
+  organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  refreshTokens     RefreshToken[]
+  ownedProjects     Project[]
+  assignedTasks     Task[]           @relation("TaskAssignee")
+  reportedTasks     Task[]           @relation("TaskReporter")
+  teamMemberships   TeamMembership[]
+  teamInvitations   TeamInvitation[] @relation("InvitedByUser")
+  ownedTeams        Team[]
+  notifications     Notification[]
+  activityLogs      ActivityLog[]
+  uploadedDocuments Document[]
+
+  // CRM Relations
+  clients       Client[]
+  assignedLeads Lead[]
+  crmActivities CRMActivity[]
+  AIUsageLog    AIUsageLog[]
+
+  @@index([organizationId])
+  @@index([email])
+}
+
+model RefreshToken {
+  id        String    @id @default(uuid())
+  token     String    @unique
+  userId    String
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([token])
+}
+
+// -----------------------------------------------------------------------------
+// PLACEHOLDER MODELS (Multi-Tenant Modules)
+// -----------------------------------------------------------------------------
+
+model Team {
+  id             String    @id @default(uuid())
+  organizationId String
+  name           String
+  description    String?   @db.Text
+  color          String?
+  icon           String?
+  ownerId        String
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User             @relation(fields: [ownerId], references: [id])
+  memberships  TeamMembership[]
+  invitations  TeamInvitation[]
+
+  @@index([organizationId])
+  @@index([ownerId])
+}
+
+model TeamMembership {
+  id       String   @id @default(uuid())
+  teamId   String
+  userId   String
+  role     TeamRole @default(MEMBER)
+  joinedAt DateTime @default(now())
+
+  team Team @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([teamId, userId])
+  @@index([teamId])
+  @@index([userId])
+}
+
+model TeamInvitation {
+  id             String           @id @default(uuid())
+  organizationId String
+  teamId         String
+  email          String
+  invitedById    String
+  status         InvitationStatus @default(PENDING)
+  expiresAt      DateTime
+  createdAt      DateTime         @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  team         Team         @relation(fields: [teamId], references: [id], onDelete: Cascade)
+  invitedBy    User         @relation("InvitedByUser", fields: [invitedById], references: [id])
+
+  @@index([organizationId])
+  @@index([teamId])
+  @@index([email])
+}
+
+model Project {
+  id             String        @id @default(uuid())
+  organizationId String
+  name           String
+  key            String
+  description    String?       @db.Text
+  status         ProjectStatus @default(PLANNING)
+  color          String?
+  icon           String?
+  ownerId        String
+  startDate      DateTime?
+  endDate        DateTime?
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User         @relation(fields: [ownerId], references: [id])
+  tasks        Task[]
+  documents    Document[]
+
+  @@unique([organizationId, key])
+  @@index([organizationId])
+  @@index([ownerId])
+  @@index([status])
+  @@index([key])
+}
+
+model Task {
+  id             String       @id @default(uuid())
+  organizationId String
+  projectId      String
+  parentTaskId   String?
+  title          String
+  description    String?      @db.Text
+  status         TaskStatus   @default(TODO)
+  priority       TaskPriority @default(MEDIUM)
+  assigneeId     String?
+  reporterId     String
+  dueDate        DateTime?
+  estimatedHours Float?
+  completedAt    DateTime?
+  position       Float
+  archived       Boolean      @default(false)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  parentTask   Task?        @relation("Subtasks", fields: [parentTaskId], references: [id])
+  subtasks     Task[]       @relation("Subtasks")
+  assignee     User?        @relation("TaskAssignee", fields: [assigneeId], references: [id])
+  reporter     User         @relation("TaskReporter", fields: [reporterId], references: [id])
+  documents    Document[]
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([status])
+  @@index([assigneeId])
+  @@index([reporterId])
+}
+
+enum ClientStatus {
+  ACTIVE
+  INACTIVE
+  ARCHIVED
+}
+
+enum LeadStatus {
+  NEW
+  CONTACTED
+  QUALIFIED
+  UNQUALIFIED
+  CONVERTED
+}
+
+enum CRMActivityType {
+  CALL
+  EMAIL
+  MEETING
+  NOTE
+  STATUS_CHANGE
+}
+
+model Client {
+  id             String       @id @default(uuid())
+  organizationId String
+  name           String
+  industry       String?
+  website        String?
+  phone          String?
+  email          String?
+  address        String?
+  ownerId        String
+  status         ClientStatus @default(ACTIVE)
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  owner        User          @relation(fields: [ownerId], references: [id])
+  contacts     Contact[]
+  activities   CRMActivity[]
+
+  @@index([organizationId])
+  @@index([ownerId])
+}
+
+model Contact {
+  id             String    @id @default(uuid())
+  organizationId String
+  clientId       String
+  firstName      String
+  lastName       String
+  email          String?
+  phone          String?
+  designation    String?
+  createdAt      DateTime  @default(now())
+  updatedAt      DateTime  @updatedAt
+  deletedAt      DateTime?
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([clientId])
+}
+
+model Lead {
+  id             String     @id @default(uuid())
+  organizationId String
+  title          String
+  source         String?
+  score          Float?     @default(0)
+  status         LeadStatus @default(NEW)
+  assignedTo     String?
+  expectedValue  Float?
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  deletedAt      DateTime?
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  assignee      User?         @relation(fields: [assignedTo], references: [id])
+  opportunities Opportunity[]
+  activities    CRMActivity[]
+
+  @@index([organizationId])
+  @@index([assignedTo])
+}
+
+model PipelineStage {
+  id             String   @id @default(uuid())
+  organizationId String
+  name           String
+  probability    Float    @default(0)
+  position       Float
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  opportunities Opportunity[]
+
+  @@index([organizationId])
+}
+
+model Opportunity {
+  id              String    @id @default(uuid())
+  organizationId  String
+  leadId          String
+  stageId         String
+  expectedRevenue Float?
+  closeDate       DateTime?
+  probability     Float?
+  createdAt       DateTime  @default(now())
+  updatedAt       DateTime  @updatedAt
+  deletedAt       DateTime?
+
+  organization Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  lead         Lead          @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  stage        PipelineStage @relation(fields: [stageId], references: [id])
+  activities   CRMActivity[]
+
+  @@index([organizationId])
+  @@index([leadId])
+  @@index([stageId])
+}
+
+model CRMActivity {
+  id             String          @id @default(uuid())
+  organizationId String
+  type           CRMActivityType
+  content        String          @db.Text
+  clientId       String?
+  leadId         String?
+  opportunityId  String?
+  createdById    String
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  client       Client?      @relation(fields: [clientId], references: [id], onDelete: Cascade)
+  lead         Lead?        @relation(fields: [leadId], references: [id], onDelete: Cascade)
+  opportunity  Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
+  createdBy    User         @relation(fields: [createdById], references: [id])
+
+  @@index([organizationId])
+  @@index([clientId])
+  @@index([leadId])
+  @@index([opportunityId])
+  @@index([createdById])
+}
+
+model CalendarEvent {
+  id             String   @id @default(uuid())
+  organizationId String
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+}
+
+model Notification {
+  id             String           @id @default(uuid())
+  organizationId String
+  userId         String
+  type           NotificationType @default(INFO)
+  title          String
+  message        String
+  link           String?
+  read           Boolean          @default(false)
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([read])
+}
+
+model ActivityLog {
+  id             String       @id @default(uuid())
+  organizationId String
+  userId         String?
+  type           ActivityType
+  entityType     String
+  entityId       String
+  metadata       Json?
+  createdAt      DateTime     @default(now())
+  updatedAt      DateTime     @updatedAt
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([organizationId])
+  @@index([userId])
+  @@index([type])
+  @@index([entityType, entityId])
+}
+
+model Document {
+  id               String    @id @default(uuid())
+  organizationId   String
+  projectId        String?
+  taskId           String?
+  uploadedById     String
+  fileName         String
+  originalName     String
+  mimeType         String
+  fileSize         Int
+  storageKey       String
+  storageProvider  String    @default("local")
+  version          Int       @default(1)
+  isLatest         Boolean   @default(true)
+  parentDocumentId String?
+  createdAt        DateTime  @default(now())
+  updatedAt        DateTime  @updatedAt
+  deletedAt        DateTime?
+
+  organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  task           Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  uploadedBy     User         @relation(fields: [uploadedById], references: [id])
+  parentDocument Document?    @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
+  versions       Document[]   @relation("DocumentVersions")
+
+  @@index([organizationId])
+  @@index([projectId])
+  @@index([taskId])
+  @@index([parentDocumentId])
+}
+
+model AIUsageLog {
+  id               String   @id @default(uuid())
+  organizationId   String
+  userId           String
+  provider         String
+  model            String
+  promptTokens     Int      @default(0)
+  completionTokens Int      @default(0)
+  totalTokens      Int      @default(0)
+  latencyMs        Int?
+  cost             Float?   @default(0)
+  feature          String? // e.g., 'task_summary', 'assistant'
+  success          Boolean  @default(true)
+  errorMessage     String?  @db.Text
+  createdAt        DateTime @default(now())
+
+  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([organizationId])
+  @@index([userId])
+}
