@@ -9,7 +9,10 @@ const envSchema = z.object({
   ACCESS_TOKEN_EXPIRES_IN: z.string().default('15m'),
   REFRESH_TOKEN_EXPIRES_IN: z.string().default('7d'),
   FRONTEND_URL: z.string().url().default('http://localhost:5173'),
-  REDIS_URL: z.string().url().optional(),
+REDIS_URL: z
+  .string()
+  .url()
+  .default("redis://localhost:6379"),
 }).superRefine((env, ctx) => {
   if (env.NODE_ENV === 'production' && !env.REDIS_URL) {
     ctx.addIssue({

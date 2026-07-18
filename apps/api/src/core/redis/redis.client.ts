@@ -1,30 +1,33 @@
 import Redis from 'ioredis';
+import { env } from '../../config/env';
 
-// Use a singleton pattern to reuse the Redis connection across the application
-let redisClient: Redis;
+let redisClient: Redis | null = null;
 
 export const getRedisClient = (): Redis => {
   if (!redisClient) {
-    const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
-    redisClient = new Redis(redisUrl, {
-      maxRetriesPerRequest: null, // Required by BullMQ
-      enableReadyCheck: false,
-    });
-    
-    redisClient.on('error', (err) => {
-      console.error('Redis connection error:', err);
-    });
+    redisClient = new Redis(
+      env.REDIS_URL ?? 'redis://localhost:6379',
+      {
+        maxRetriesPerRequest: null, // Required by BullMQ
+        enableReadyCheck: false,
+        lazyConnect: true,
+      }
+    );
 
     redisClient.on('connect', () => {
-      console.log('Connected to Redis for Job Queues');
+      console.log('✅ Connected to Redis');
+    });
+
+    redisClient.on('ready', () => {
+      console.log('✅ Redis is ready');
+    });
+
+    redisClient.on('error', (err) => {
+      console.error('❌ Redis connection error:', err.message);
     });
   }
 
   return redisClient;
 };
 
-// Also export connection options directly for BullMQ workers that prefer it
-export const redisConnection = {
-  host: process.env.REDIS_HOST || 'localhost',
-  port: parseInt(process.env.REDIS_PORT || '6379', 10),
-};
+export const redisConnection = env.REDIS_URL ?? 'redis://localhost:6379';

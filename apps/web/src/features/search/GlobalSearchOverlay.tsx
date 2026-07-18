@@ -1,10 +1,10 @@
-import React, { useState, useEffect, useRef } from 'react';
+import { useEffect, useRef, useState, type FC } from 'react';
 import { Search, Loader2, X, FolderKanban, CheckSquare, UsersRound } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useGlobalSearch } from './hooks/useSearch';
 import { useDebounce } from 'use-debounce';
 
-export const GlobalSearchOverlay: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+export const GlobalSearchOverlay: FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [debouncedTerm] = useDebounce(searchTerm, 300);
   const inputRef = useRef<HTMLInputElement>(null);

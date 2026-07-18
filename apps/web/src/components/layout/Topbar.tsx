@@ -1,4 +1,4 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { useUiStore } from '../../store/uiStore';
 import { Menu, Search } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
@@ -9,9 +9,9 @@ import { GlobalSearchOverlay } from '../../features/search/GlobalSearchOverlay';
 export const Topbar = () => {
   const { toggleSidebar } = useUiStore();
   const location = useLocation();
-  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card, Title, AreaChart, Text } from '@tremor/react';
 
 interface TimeSeriesChartProps {
@@ -11,7 +10,7 @@ interface TimeSeriesChartProps {
   isLoading?: boolean;
 }
 
-export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
+export const TimeSeriesChart = ({
   title,
   data,
   index,
@@ -19,7 +18,7 @@ export const TimeSeriesChart: React.FC<TimeSeriesChartProps> = ({
   colors = ['blue', 'cyan'],
   valueFormatter,
   isLoading
-}) => {
+}: TimeSeriesChartProps) => {
   return (
     <Card>
       <Title>{title}</Title>

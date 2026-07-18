@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Title, Text, Card, Flex, Badge } from '@tremor/react';
 
 // Note: In a real implementation, we would use react-beautiful-dnd or dnd-kit for drag and drop
@@ -16,7 +16,7 @@ const mockOpportunities = [
   { id: '3', title: 'New Cloud Setup', expectedRevenue: 25000, stageId: '1' },
 ];
 
-export const PipelineBoard: React.FC = () => {
+export const PipelineBoard = () => {
   const [stages] = useState(mockStages);
   const [opportunities] = useState(mockOpportunities);
 

@@ -1,10 +1,9 @@
-import React from 'react';
-import { Card, Title, Text, TabGroup, TabList, Tab, TabPanels, TabPanel, Grid, Flex, Badge, Button } from '@tremor/react';
+import { Card, Title, Text, TabGroup, TabList, Tab, TabPanels, TabPanel, Grid, Flex, Button } from '@tremor/react';
 import { useParams } from 'react-router-dom';
 import { PencilIcon, TrashIcon } from '@heroicons/react/24/outline';
 
-export const ClientDetailPage: React.FC = () => {
-  const { id } = useParams<{ id: string }>();
+export const ClientDetailPage = () => {
+  useParams<{ id: string }>();
 
   // Mock data for display purposes
   const client = {

@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card, Text, Metric, Flex, Icon, BadgeDelta } from '@tremor/react';
 
 interface MetricCardProps {
@@ -13,14 +12,14 @@ interface MetricCardProps {
   isLoading?: boolean;
 }
 
-export const MetricCard: React.FC<MetricCardProps> = ({ 
+export const MetricCard = ({ 
   title, 
   metric, 
   icon, 
   trend, 
   color = 'blue',
   isLoading 
-}) => {
+}: MetricCardProps) => {
   return (
     <Card decoration="top" decorationColor={color}>
       <Flex alignItems="start">

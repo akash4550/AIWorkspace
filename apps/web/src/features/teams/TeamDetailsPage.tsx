@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
@@ -17,7 +17,7 @@ export const TeamDetailsPage = () => {
     },
   });
 
-  const { data: membersData, isLoading: membersLoading } = useQuery({
+  const { data: membersData } = useQuery({
     queryKey: ['team-members', id],
     queryFn: async () => {
       const res = await api.get(`/teams/${id}/members`);

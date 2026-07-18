@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Grid } from '@tremor/react';
 import { FilterPanel } from '../../components/analytics/FilterPanel';
 import { MetricCard } from '../../components/analytics/MetricCard';
 import { useMetric, MetricFilter } from './hooks/useAnalytics';
 
-export const TeamDashboard: React.FC = () => {
+export const TeamDashboard = () => {
   const [filters, setFilters] = useState<MetricFilter>({});
 
   // As a demonstration of individual metric fetching (instead of bundled report)

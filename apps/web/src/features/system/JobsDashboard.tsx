@@ -1,9 +1,9 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Title, Grid, Card, Text, Badge, Button, Table, TableHead, TableRow, TableHeaderCell, TableBody, TableCell } from '@tremor/react';
 import { useQueueStatus, useRetryJobs, useFailedJobs } from './hooks/useJobs';
 import { Play } from 'lucide-react';
 
-export const JobsDashboard: React.FC = () => {
+export const JobsDashboard = () => {
   const { data: queues, isLoading } = useQueueStatus();
   const retryMutation = useRetryJobs();
   

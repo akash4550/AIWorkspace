@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Outlet } from 'react-router-dom';
-import { Sidebar } from './Sidebar';
-import { Topbar } from './Topbar';
-import { useUiStore } from '../../store/uiStore';
+import { Sidebar } from '../components/layout/Sidebar';
+import { Topbar } from '../components/layout/Topbar';
+import { useUiStore } from '../store/uiStore';
 import { AIAssistantPanel } from '../features/ai/AIAssistantPanel';
 import { Bot } from 'lucide-react';
 

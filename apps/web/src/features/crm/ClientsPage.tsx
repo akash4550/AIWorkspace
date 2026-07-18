@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, Title, Text, Table, TableHead, TableHeaderCell, TableBody, TableRow, TableCell, Badge, Button, Flex } from '@tremor/react';
 import { PlusIcon } from '@heroicons/react/24/outline';
 import { Link } from 'react-router-dom';
@@ -9,7 +9,7 @@ const mockClients = [
   { id: '3', name: 'Wayne Enterprises', industry: 'Investment', email: 'bruce@wayne.com', status: 'INACTIVE' },
 ];
 
-export const ClientsPage: React.FC = () => {
+export const ClientsPage = () => {
   const [clients] = useState(mockClients);
 
   return (

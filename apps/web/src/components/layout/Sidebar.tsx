@@ -1,4 +1,3 @@
-import React from 'react';
 import { useUiStore } from '../../store/uiStore';
 import { navigationConfig } from '../../config/navigation';
 import { Link, useLocation } from 'react-router-dom';

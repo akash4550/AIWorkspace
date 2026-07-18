@@ -8,7 +8,25 @@
     "dev": "npm run dev --workspaces --if-present",
     "build": "npm run build --workspaces --if-present",
     "lint": "npm run lint --workspaces --if-present",
-    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\""
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+
+    "api": "npm run dev --workspace=api",
+    "web": "npm run dev --workspace=web",
+
+    "infra:start": "docker compose up -d",
+    "infra:stop": "docker compose down",
+    "infra:restart": "docker compose restart",
+    "infra:logs": "docker compose logs -f",
+    "infra:status": "docker ps",
+
+    "dev:full": "npm run infra:start && npm run dev"
+  },
+  "overrides": {
+    "ioredis": "5.10.1",
+    "@tremor/react": {
+      "react": "19.2.7",
+      "react-dom": "19.2.7"
+    }
   },
   "devDependencies": {
     "prettier": "^3.0.0"
