@@ -1,56 +1,400 @@
+import bcrypt from 'bcrypt';
+
+import { Role } from '@prisma/client';
+
 import { UserRepository } from './user.repository';
-import { CreateUserDto, UpdateUserDto, UserQueryDto } from './user.dto';
+
+import {
+  CreateUserDto,
+  UpdateUserDto,
+  UserQueryDto,
+} from './user.dto';
+
 import { AppError } from '../../core/errors/AppError';
 
+
+
 export class UserService {
-    private repository: UserRepository;
 
-    constructor() {
-        this.repository = new UserRepository();
-    }
 
-    async getUsers(organizationId: string, query: UserQueryDto) {
-        // Zod parses query params as strings. Let's ensure types are casted properly in controller.
-        return this.repository.findMany(organizationId, query);
-    }
+  private repository: UserRepository;
 
-    async getUserById(organizationId: string, userId: string) {
-        const user = await this.repository.findById(organizationId, userId);
-        if (!user) {
-            throw new AppError('User not found', 404);
+
+
+  constructor() {
+
+    this.repository = new UserRepository();
+
+  }
+
+
+
+
+
+
+  async getUsers(
+    organizationId: string,
+    query: UserQueryDto
+  ) {
+
+
+    const page = query.page ?? 1;
+
+    const limit = query.limit ?? 20;
+
+
+
+    const result =
+      await this.repository.findMany(
+
+        organizationId,
+
+        {
+
+          skip: (page - 1) * limit,
+
+          take: limit,
+
+          search: query.search,
+
+          role: query.role,
+
         }
-        return user;
+
+      );
+
+
+
+    return {
+
+      users: result.users,
+
+
+      pagination: {
+
+        page,
+
+        limit,
+
+        total: result.total,
+
+        totalPages: Math.ceil(
+          result.total / limit
+        ),
+
+      },
+
+    };
+
+  }
+
+
+
+
+
+
+
+
+  async getUserById(
+    organizationId: string,
+    userId: string
+  ) {
+
+
+    const user =
+      await this.repository.findById(
+
+        userId,
+
+        organizationId
+
+      );
+
+
+
+    if (!user) {
+
+      throw new AppError(
+        'User not found',
+        404
+      );
+
     }
 
-    async createUser(organizationId: string, data: CreateUserDto) {
-        const existing = await this.repository.findByEmail(organizationId, data.email);
-        if (existing) {
-            throw new AppError('User with this email already exists in the organization', 400);
-        }
-        return this.repository.create(organizationId, data);
+
+
+    return user;
+
+  }
+
+
+
+
+
+
+
+
+  async createUser(
+    organizationId: string,
+    data: CreateUserDto
+  ) {
+
+
+    const existing =
+      await this.repository.findByEmail(
+
+        data.email,
+
+        organizationId
+
+      );
+
+
+
+    if (existing) {
+
+      throw new AppError(
+
+        'User with this email already exists',
+
+        400
+
+      );
+
     }
 
-    async updateUser(organizationId: string, userId: string, data: UpdateUserDto) {
-        const user = await this.repository.safeUpdate(organizationId, userId, data);
-        if (!user) {
-            throw new AppError('User not found', 404);
-        }
-        return user;
+
+
+    if (data.role === Role.SUPER_ADMIN) {
+
+      throw new AppError(
+
+        'Cannot create SUPER_ADMIN user',
+
+        403
+
+      );
+
     }
 
-    async updateUserStatus(organizationId: string, userId: string, isActive: boolean) {
-        const user = await this.repository.safeUpdate(organizationId, userId, { isActive });
-        if (!user) {
-            throw new AppError('User not found', 404);
-        }
-        return user;
+
+
+    if (!data.password) {
+
+      throw new AppError(
+
+        'Password is required',
+
+        400
+
+      );
+
     }
 
-    async deleteUser(organizationId: string, userId: string) {
-        const user = await this.repository.softDelete(organizationId, userId);
-        if (!user) {
-            throw new AppError('User not found', 404);
-        }
-        return user;
+
+
+
+    const password =
+      await bcrypt.hash(
+
+        data.password,
+
+        12
+
+      );
+
+
+
+
+
+    return this.repository.create({
+
+      email: data.email.toLowerCase(),
+
+
+      password,
+
+
+      firstName: data.firstName,
+
+
+      lastName: data.lastName,
+
+
+      role:
+        data.role ?? Role.EMPLOYEE,
+
+
+
+      organization: {
+
+        connect: {
+
+          id: organizationId,
+
+        },
+
+      },
+
+    });
+
+  }
+
+
+
+
+
+
+
+
+
+  async updateUser(
+    organizationId: string,
+    userId: string,
+    data: UpdateUserDto
+  ) {
+
+
+    const exists =
+      await this.repository.exists(
+
+        userId,
+
+        organizationId
+
+      );
+
+
+
+    if (!exists) {
+
+      throw new AppError(
+
+        'User not found',
+
+        404
+
+      );
+
     }
+
+
+
+    return this.repository.update(
+
+      userId,
+
+      organizationId,
+
+      data
+
+    );
+
+  }
+
+
+
+
+
+
+
+
+
+  async updateUserStatus(
+    organizationId: string,
+    userId: string,
+    isActive: boolean
+  ) {
+
+
+    const exists =
+      await this.repository.exists(
+
+        userId,
+
+        organizationId
+
+      );
+
+
+
+    if (!exists) {
+
+      throw new AppError(
+
+        'User not found',
+
+        404
+
+      );
+
+    }
+
+
+
+    return this.repository.update(
+
+      userId,
+
+      organizationId,
+
+      {
+
+        isActive,
+
+      }
+
+    );
+
+  }
+
+
+
+
+
+
+
+
+
+  async deleteUser(
+    organizationId: string,
+    userId: string
+  ) {
+
+
+    const exists =
+      await this.repository.exists(
+
+        userId,
+
+        organizationId
+
+      );
+
+
+
+    if (!exists) {
+
+      throw new AppError(
+
+        'User not found',
+
+        404
+
+      );
+
+    }
+
+
+
+    return this.repository.softDelete(
+
+      userId,
+
+      organizationId
+
+    );
+
+  }
+
 }

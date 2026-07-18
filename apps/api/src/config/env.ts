@@ -1,35 +1,37 @@
+import 'dotenv/config';
 import { z } from 'zod';
 
 const envSchema = z.object({
   NODE_ENV: z.enum(['development', 'test', 'production']).default('development'),
-  PORT: z.string().default('4000').transform(val => parseInt(val, 10)),
-  DATABASE_URL: z.string().url('DATABASE_URL must be a valid URL'),
-  JWT_SECRET: z.string().min(16, 'JWT_SECRET must be at least 16 characters long'),
-  FRONTEND_URL: z.string().url('FRONTEND_URL must be a valid URL').default('http://localhost:5173'),
-  REDIS_URL: z.string().url('REDIS_URL must be a valid URL').optional(),
+  PORT: z.coerce.number().int().min(1).max(65535).default(4000),
+  DATABASE_URL: z.string().url(),
+  JWT_SECRET: z.string().min(16),
+  ACCESS_TOKEN_EXPIRES_IN: z.string().default('15m'),
+  REFRESH_TOKEN_EXPIRES_IN: z.string().default('7d'),
+  FRONTEND_URL: z.string().url().default('http://localhost:5173'),
+  REDIS_URL: z.string().url().optional(),
+}).superRefine((env, ctx) => {
+  if (env.NODE_ENV === 'production' && !env.REDIS_URL) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['REDIS_URL'],
+      message: 'REDIS_URL is required in production',
+    });
+  }
 });
 
-export type EnvConfig = z.infer<typeof envSchema>;
+export type Env = z.infer<typeof envSchema>;
+const parsed = envSchema.safeParse(process.env);
 
-let envConfig: EnvConfig;
-
-try {
-  envConfig = envSchema.parse(process.env);
-} catch (error) {
-  if (error instanceof z.ZodError) {
-    console.error('❌ Invalid environment variables:', error.flatten().fieldErrors);
-    // In production, we MUST fail fast if environment is misconfigured
-    if (process.env.NODE_ENV === 'production') {
-      process.exit(1);
-    }
-    
-    // In development, we can try to proceed but warn loudly
-    console.warn('⚠️ Proceeding with potentially invalid environment because NODE_ENV !== production');
-    // We cast this just to allow local dev to boot if strictly necessary, but it's risky
-    envConfig = process.env as unknown as EnvConfig; 
-  } else {
-    throw error;
-  }
+if (!parsed.success) {
+  console.error('❌ Environment validation failed');
+console.table(
+  parsed.error.issues.map(issue => ({
+    Field: issue.path.join('.'),
+    Error: issue.message,
+  }))
+);
+process.exit(1);
 }
 
-export const env = envConfig;
+export const env = Object.freeze(parsed.data);

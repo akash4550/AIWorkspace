@@ -1,68 +1,81 @@
 import { Router } from 'express';
+
 import { TaskController } from './task.controller';
+import { canUpdateTask } from './task.permissions';
+import {
+  createTaskSchema,
+  moveTaskSchema,
+  updateTaskSchema,
+} from './task.validator';
+
 import { requireAuth } from '../../core/middlewares/authMiddleware';
-import { requireRole } from '../../core/middlewares/rbacMiddleware';
+import { authorize } from '../../core/middlewares/authorize';
+import { requireOwnership } from '../../core/middlewares/ownership';
 import { validateRequest } from '../../core/middlewares/validateRequest';
-import { createTaskSchema, updateTaskSchema, moveTaskSchema } from './task.validator';
 import { asyncWrapper } from '../../core/utils/asyncWrapper';
+import { PERMISSIONS } from '../../core/auth/permissions';
 
 const router = Router();
 const controller = new TaskController();
 
 router.use(requireAuth);
 
-router.get('/', asyncWrapper(controller.getTasks));
-router.get('/:id', asyncWrapper(controller.getTaskById));
+router.get(
+  '/',
+  authorize(PERMISSIONS.TASK.READ),
+  asyncWrapper(controller.getTasks)
+);
 
-// Employees can create tasks
+router.get(
+  '/:id',
+  authorize(PERMISSIONS.TASK.READ),
+  asyncWrapper(controller.getTaskById)
+);
+
 router.post(
-    '/',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE'),
-    validateRequest(createTaskSchema),
-    asyncWrapper(controller.createTask)
-);
-
-// Updates to core info
-router.patch(
-    '/:id',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE'),
-    validateRequest(updateTaskSchema),
-    asyncWrapper(controller.updateTask)
-);
-
-// Drag and drop movement
-router.patch(
-    '/:id/move',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER', 'EMPLOYEE'),
-    validateRequest(moveTaskSchema),
-    asyncWrapper(controller.moveTask)
-);
-
-// Assignment
-router.patch(
-    '/:id/assign',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER'),
-    asyncWrapper(controller.assignTask)
-);
-
-// Archiving
-router.patch(
-    '/:id/archive',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER'),
-    asyncWrapper(controller.archiveTask)
+  '/',
+  authorize(PERMISSIONS.TASK.CREATE),
+  validateRequest(createTaskSchema),
+  asyncWrapper(controller.createTask)
 );
 
 router.patch(
-    '/:id/restore',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER'),
-    asyncWrapper(controller.restoreTask)
+  '/:id',
+  authorize(PERMISSIONS.TASK.UPDATE),
+  requireOwnership(canUpdateTask),
+  validateRequest(updateTaskSchema),
+  asyncWrapper(controller.updateTask)
 );
 
-// Deletion (Employees cannot delete)
+router.patch(
+  '/:id/move',
+  authorize(PERMISSIONS.TASK.UPDATE),
+  validateRequest(moveTaskSchema),
+  asyncWrapper(controller.moveTask)
+);
+
+router.patch(
+  '/:id/assign',
+  authorize(PERMISSIONS.TASK.ASSIGN),
+  asyncWrapper(controller.assignTask)
+);
+
+router.patch(
+  '/:id/archive',
+  authorize(PERMISSIONS.TASK.ARCHIVE),
+  asyncWrapper(controller.archiveTask)
+);
+
+router.patch(
+  '/:id/restore',
+  authorize(PERMISSIONS.TASK.ARCHIVE),
+  asyncWrapper(controller.restoreTask)
+);
+
 router.delete(
-    '/:id',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER'),
-    asyncWrapper(controller.deleteTask)
+  '/:id',
+  authorize(PERMISSIONS.TASK.DELETE),
+  asyncWrapper(controller.deleteTask)
 );
 
 export default router;

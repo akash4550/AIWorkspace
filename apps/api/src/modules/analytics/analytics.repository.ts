@@ -1,4 +1,4 @@
-import { prisma } from '../../core/db/prisma';
+import { prisma } from '../../config/prisma';
 import { MetricFilterDto } from './analytics.dto';
 
 export class AnalyticsRepository {

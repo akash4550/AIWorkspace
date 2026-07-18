@@ -1,47 +1,131 @@
 import { Router } from 'express';
+
 import { UserController } from './user.controller';
+
 import { requireAuth } from '../../core/middlewares/authMiddleware';
-import { requireRole } from '../../core/middlewares/rbacMiddleware';
+
+import { requirePermission } from '../../core/middlewares/rbacMiddleware';
+
 import { validateRequest } from '../../core/middlewares/validateRequest';
-import { createUserSchema, updateUserSchema, updateUserStatusSchema } from './user.validator';
-import { asyncWrapper } from '../../core/utils/asyncWrapper';
+
+import {
+  createUserSchema,
+  updateUserSchema,
+  updateUserStatusSchema,
+  getUserSchema,
+  listUsersSchema,
+} from './user.validator';
+
+import { PERMISSIONS } from '../../core/auth/permissions';
+
+
 
 const router = Router();
+
 const controller = new UserController();
+
+
+
+
+// Authentication required for all user routes
 
 router.use(requireAuth);
 
-router.get('/', asyncWrapper(controller.getUsers));
-router.get('/:id', asyncWrapper(controller.getUserById));
+
+
+
+
+router.get(
+
+  '/',
+
+  requirePermission(PERMISSIONS.USER.READ),
+
+  validateRequest(listUsersSchema),
+
+  controller.getUsers
+
+);
+
+
+
+
+
+router.get(
+
+  '/:id',
+
+  requirePermission(PERMISSIONS.USER.READ),
+
+  validateRequest(getUserSchema),
+
+  controller.getUserById
+
+);
+
+
+
+
 
 router.post(
-    '/',
-    requireRole('SUPER_ADMIN', 'ADMIN'),
-    validateRequest(createUserSchema),
-    asyncWrapper(controller.createUser)
+
+  '/',
+
+  requirePermission(PERMISSIONS.USER.CREATE),
+
+  validateRequest(createUserSchema),
+
+  controller.createUser
+
 );
 
-// Note: In a real app, users should be able to update their *own* profile.
-// For enterprise admin management, we restrict this route to ADMIN/SUPER_ADMIN 
-// or check if `req.user.id === req.params.id` in the controller.
-router.patch(
-    '/:id',
-    requireRole('SUPER_ADMIN', 'ADMIN'), // Simplification for user management dashboard
-    validateRequest(updateUserSchema),
-    asyncWrapper(controller.updateUser)
-);
+
+
+
 
 router.patch(
-    '/:id/status',
-    requireRole('SUPER_ADMIN', 'ADMIN'),
-    validateRequest(updateUserStatusSchema),
-    asyncWrapper(controller.updateUserStatus)
+
+  '/:id',
+
+  requirePermission(PERMISSIONS.USER.UPDATE),
+
+  validateRequest(updateUserSchema),
+
+  controller.updateUser
+
 );
+
+
+
+
+
+router.patch(
+
+  '/:id/status',
+
+  requirePermission(PERMISSIONS.USER.UPDATE),
+
+  validateRequest(updateUserStatusSchema),
+
+  controller.updateUserStatus
+
+);
+
+
+
+
 
 router.delete(
-    '/:id',
-    requireRole('SUPER_ADMIN', 'ADMIN'),
-    asyncWrapper(controller.deleteUser)
+
+  '/:id',
+
+  requirePermission(PERMISSIONS.USER.DELETE),
+
+  controller.deleteUser
+
 );
+
+
+
 
 export default router;

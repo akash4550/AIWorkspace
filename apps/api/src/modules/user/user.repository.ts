@@ -1,130 +1,365 @@
-import { PrismaClient, Prisma } from '@prisma/client';
-import { CreateUserDto, UpdateUserDto, UserQueryDto } from './user.dto';
+import { Prisma, User } from '@prisma/client';
 
-const prisma = new PrismaClient();
+import { prisma } from '../../config/prisma';
 
-// Fields to exclude from the returned payload (e.g. password)
-const userSelect = {
-    id: true,
-    organizationId: true,
-    firstName: true,
-    lastName: true,
-    email: true,
-    role: true,
-    avatar: true,
-    isActive: true,
-    lastLogin: true,
-    createdAt: true,
-    updatedAt: true,
-    deletedAt: true,
-};
+
+const userSafeSelect = {
+  id: true,
+  firstName: true,
+  lastName: true,
+  email: true,
+  role: true,
+  avatar: true,
+  organizationId: true,
+  isActive: true,
+  emailVerified: true,
+  createdAt: true,
+  updatedAt: true,
+} satisfies Prisma.UserSelect;
+
+
 
 export class UserRepository {
-    async findById(organizationId: string, id: string) {
-        return prisma.user.findFirst({
-            where: { id, organizationId, deletedAt: null },
-            select: userSelect
-        });
+
+
+  async findMany(
+    organizationId: string,
+    options?: {
+      skip?: number;
+      take?: number;
+      search?: string;
+      role?: User['role'];
     }
+  ) {
 
-    async findByEmail(organizationId: string, email: string) {
-        return prisma.user.findFirst({
-            where: { email, organizationId, deletedAt: null },
-            select: userSelect
-        });
-    }
 
-    async findMany(organizationId: string, query: UserQueryDto) {
-        const { page = 1, limit = 10, search, role, isActive } = query;
-        const skip = (page - 1) * limit;
+    const where: Prisma.UserWhereInput = {
 
-        const where: Prisma.UserWhereInput = {
-            organizationId,
-            deletedAt: null,
-        };
+      organizationId,
 
-        if (search) {
-            where.OR = [
-                { firstName: { contains: search, mode: 'insensitive' } },
-                { lastName: { contains: search, mode: 'insensitive' } },
-                { email: { contains: search, mode: 'insensitive' } },
-            ];
-        }
+      deletedAt: null,
 
-        if (role) {
-            where.role = role;
-        }
 
-        // Must explicitly check boolean because undefined means no filter
-        if (typeof isActive === 'boolean') {
-            where.isActive = isActive;
-        }
+      ...(options?.search && {
 
-        const [users, total] = await Promise.all([
-            prisma.user.findMany({
-                where,
-                skip,
-                take: limit,
-                orderBy: { createdAt: 'desc' },
-                select: userSelect
-            }),
-            prisma.user.count({ where })
-        ]);
+        OR: [
 
-        return {
-            data: users,
-            meta: {
-                total,
-                page,
-                limit,
-                totalPages: Math.ceil(total / limit)
-            }
-        };
-    }
-
-    async create(organizationId: string, data: CreateUserDto) {
-        return prisma.user.create({
-            data: {
-                organizationId,
-                firstName: data.firstName,
-                lastName: data.lastName,
-                email: data.email,
-                role: data.role,
-                password: data.password || 'TEMPORARY_HASHED_PASSWORD', // In real life, generate random hash and send email
+          {
+            firstName: {
+              contains: options.search,
+              mode: 'insensitive',
             },
-            select: userSelect
-        });
-    }
+          },
 
-    async update(organizationId: string, id: string, data: UpdateUserDto) {
-        return prisma.user.update({
-            where: { id_organizationId: { id, organizationId } }, // If we had compound unique. Since id is unique globally:
-            // Actually, prisma update requires unique identifier. ID is globally unique. 
-            // But we must enforce tenant isolation, so we use updateMany or findFirst then update.
-            // A safer approach:
-        });
-    }
+          {
+            lastName: {
+              contains: options.search,
+              mode: 'insensitive',
+            },
+          },
 
-    async safeUpdate(organizationId: string, id: string, data: Partial<Prisma.UserUpdateInput>) {
-        // Enforce tenant boundary
-        const user = await this.findById(organizationId, id);
-        if (!user) return null;
+          {
+            email: {
+              contains: options.search,
+              mode: 'insensitive',
+            },
+          },
 
-        return prisma.user.update({
-            where: { id },
-            data,
-            select: userSelect
-        });
-    }
+        ],
 
-    async softDelete(organizationId: string, id: string) {
-        const user = await this.findById(organizationId, id);
-        if (!user) return null;
+      }),
 
-        return prisma.user.update({
-            where: { id },
-            data: { deletedAt: new Date(), isActive: false },
-            select: userSelect
-        });
-    }
+
+
+      ...(options?.role && {
+
+        role: options.role,
+
+      }),
+
+    };
+
+
+
+    const [users, total] =
+      await prisma.$transaction([
+
+
+        prisma.user.findMany({
+
+          where,
+
+          skip: options?.skip,
+
+          take: options?.take,
+
+
+          select: userSafeSelect,
+
+
+          orderBy: {
+
+            createdAt: 'desc',
+
+          },
+
+        }),
+
+
+
+        prisma.user.count({
+
+          where,
+
+        }),
+
+
+      ]);
+
+
+
+    return {
+
+      users,
+
+      total,
+
+    };
+
+  }
+
+
+
+
+
+
+  async findById(
+    id: string,
+    organizationId: string
+  ) {
+
+
+    return prisma.user.findFirst({
+
+      where: {
+
+        id,
+
+        organizationId,
+
+        deletedAt: null,
+
+      },
+
+
+      select: userSafeSelect,
+
+    });
+
+  }
+
+
+
+
+
+
+
+  async findByEmail(
+    email: string,
+    organizationId: string
+  ) {
+
+
+    return prisma.user.findFirst({
+
+      where: {
+
+        email,
+
+        organizationId,
+
+        deletedAt: null,
+
+      },
+
+
+      select: {
+
+        ...userSafeSelect,
+
+        password: true,
+
+      },
+
+    });
+
+  }
+
+
+
+
+
+
+
+  async findByEmailGlobal(
+    email: string
+  ) {
+
+
+    return prisma.user.findFirst({
+
+      where: {
+
+        email,
+
+        deletedAt: null,
+
+      },
+
+
+      select: {
+
+        ...userSafeSelect,
+
+        password: true,
+
+      },
+
+    });
+
+  }
+
+
+
+
+
+
+
+  async create(
+    data: Prisma.UserCreateInput
+  ) {
+
+
+    return prisma.user.create({
+
+      data,
+
+
+      select: userSafeSelect,
+
+    });
+
+  }
+
+
+
+
+
+
+
+  async update(
+    id: string,
+    organizationId: string,
+    data: Prisma.UserUpdateInput
+  ) {
+
+
+    return prisma.user.update({
+
+      where: {
+
+        id,
+
+        organizationId,
+
+      },
+
+
+      data,
+
+
+      select: userSafeSelect,
+
+    });
+
+  }
+
+
+
+
+
+
+
+  async softDelete(
+    id: string,
+    organizationId: string
+  ) {
+
+
+    return prisma.user.update({
+
+      where: {
+
+        id,
+
+        organizationId,
+
+      },
+
+
+      data: {
+
+        isActive: false,
+
+        deletedAt: new Date(),
+
+      },
+
+
+      select: userSafeSelect,
+
+    });
+
+  }
+
+
+
+
+
+
+
+  async exists(
+    id: string,
+    organizationId: string
+  ) {
+
+
+    const user =
+      await prisma.user.findFirst({
+
+        where: {
+
+          id,
+
+          organizationId,
+
+          deletedAt: null,
+
+        },
+
+
+        select: {
+
+          id: true,
+
+        },
+
+      });
+
+
+
+    return Boolean(user);
+
+  }
+
 }

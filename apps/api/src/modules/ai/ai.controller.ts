@@ -12,14 +12,14 @@ export class AIController {
 
   async summarizeTask(req: Request, res: Response, next: NextFunction) {
     try {
-      const { taskId } = req.params;
+      const taskId = String(req.params.taskId);
       const organizationId = req.user!.organizationId;
 
       const context = await ContextBuilder.buildTaskContext(organizationId, taskId);
 
       const response = await this.aiService.generateCompletion(
         organizationId,
-        req.user!.userId,
+        req.user!.id,
         'TASK_SUMMARY',
         {
           systemPrompt: PROMPTS.SYSTEM.DEFAULT_ASSISTANT,
@@ -49,7 +49,7 @@ export class AIController {
 
       const response = await this.aiService.generateCompletion(
         organizationId,
-        req.user!.userId,
+        req.user!.id,
         'WORKSPACE_ASSISTANT',
         {
           systemPrompt: PROMPTS.SYSTEM.DEFAULT_ASSISTANT,

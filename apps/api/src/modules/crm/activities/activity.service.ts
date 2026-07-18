@@ -14,7 +14,7 @@ export class CRMActivityService {
       organizationId,
       createdById,
       type: dto.type,
-      content: dto.content,
+      description: dto.content,
       clientId: dto.clientId,
       leadId: dto.leadId,
       opportunityId: dto.opportunityId,

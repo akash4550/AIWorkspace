@@ -21,6 +21,9 @@ export interface UpdateTaskDto {
     assigneeId?: string | null;
     dueDate?: Date | null;
     estimatedHours?: number | null;
+    position?: number;
+    archived?: boolean;
+    completedAt?: Date | null;
 }
 
 export interface MoveTaskDto {

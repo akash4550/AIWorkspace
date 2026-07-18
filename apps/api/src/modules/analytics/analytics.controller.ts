@@ -11,7 +11,7 @@ export class AnalyticsController {
   async getMetric(req: Request, res: Response, next: NextFunction) {
     try {
       const organizationId = req.user!.organizationId;
-      const { metricName } = req.params;
+      const metricName = String(req.params.metricName);
       
       // Parse query string into filters
       const filters = {
@@ -32,7 +32,7 @@ export class AnalyticsController {
   async getReport(req: Request, res: Response, next: NextFunction) {
     try {
       const organizationId = req.user!.organizationId;
-      const { reportType } = req.params;
+      const reportType = String(req.params.reportType);
 
       const filters = {
         startDate: req.query.startDate as string,

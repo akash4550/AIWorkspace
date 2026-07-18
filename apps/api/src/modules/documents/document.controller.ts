@@ -28,7 +28,7 @@ export class DocumentController {
     try {
       const organizationId = req.user!.organizationId;
       const uploadedById = req.user!.id;
-      const { id: parentDocumentId } = req.params;
+      const parentDocumentId = String(req.params.id);
       const file = req.file;
 
       if (!file) {
@@ -56,7 +56,8 @@ export class DocumentController {
   async getOne(req: Request, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
-      const document = await documentService.getDocument(organizationId, req.params.id);
+      const id = String(req.params.id);
+      const document = await documentService.getDocument(organizationId, id);
       res.json({ data: document });
     } catch (error: any) {
       res.status(404).json({ error: error.message });
@@ -66,7 +67,8 @@ export class DocumentController {
   async getVersions(req: Request, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
-      const versions = await documentService.getVersions(organizationId, req.params.id);
+      const id = String(req.params.id);
+      const versions = await documentService.getVersions(organizationId, id);
       res.json({ data: versions });
     } catch (error: any) {
       res.status(404).json({ error: error.message });
@@ -77,7 +79,8 @@ export class DocumentController {
     try {
       const organizationId = req.user!.organizationId;
       const dto = renameDocumentSchema.parse(req.body);
-      const document = await documentService.renameDocument(organizationId, req.params.id, dto);
+      const id = String(req.params.id);
+      const document = await documentService.renameDocument(organizationId, id, dto);
       res.json({ data: document });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -88,7 +91,8 @@ export class DocumentController {
     try {
       const organizationId = req.user!.organizationId;
       const dto = moveDocumentSchema.parse(req.body);
-      const document = await documentService.moveDocument(organizationId, req.params.id, dto);
+      const id = String(req.params.id);
+      const document = await documentService.moveDocument(organizationId, id, dto);
       res.json({ data: document });
     } catch (error: any) {
       res.status(400).json({ error: error.message });
@@ -98,7 +102,8 @@ export class DocumentController {
   async delete(req: Request, res: Response) {
     try {
       const organizationId = req.user!.organizationId;
-      await documentService.deleteDocument(organizationId, req.params.id);
+      const id = String(req.params.id);
+      await documentService.deleteDocument(organizationId, id);
       res.status(204).send();
     } catch (error: any) {
       res.status(400).json({ error: error.message });

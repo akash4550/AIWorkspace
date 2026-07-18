@@ -102,7 +102,10 @@ export class KPIEngine {
 
     this.registerMetric('PIPELINE_VALUE', async (orgId, filters) => {
       const opps = await this.repository.getOpportunities(orgId, filters);
-      const value = opps.reduce((sum, opp) => sum + (opp.expectedRevenue || 0), 0);
+      const value = opps.reduce((sum, opp) => {
+        const revenue = opp.expectedRevenue?.toNumber() || 0;
+        return sum + revenue;
+      }, 0);
       return {
         name: 'Pipeline Value',
         type: 'scalar',

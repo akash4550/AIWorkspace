@@ -1,7 +1,7 @@
 import { Server, Socket } from 'socket.io';
 import { Server as HttpServer } from 'http';
 import jwt from 'jsonwebtoken';
-import { config } from '../../config/env';
+import { env } from "../../config/env";
 import { PrismaClient } from '@prisma/client';
 
 const prisma = new PrismaClient();
@@ -30,7 +30,7 @@ export const initializeSocket = (httpServer: HttpServer) => {
       const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
       if (!token) return next(new Error('Authentication error'));
 
-      const decoded = jwt.verify(token, config.jwtSecret) as any;
+      const decoded = jwt.verify(token, env.JWT_SECRET) as any;
       socket.user = {
         id: decoded.id,
         organizationId: decoded.organizationId,

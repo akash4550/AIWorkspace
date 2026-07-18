@@ -1,0 +1,23 @@
+import { PERMISSIONS } from '../../core/auth/permissions';
+
+
+
+export const TEAM_PERMISSIONS = {
+
+
+  READ: PERMISSIONS.TEAM.READ,
+
+
+  CREATE: PERMISSIONS.TEAM.MANAGE,
+
+
+  UPDATE: PERMISSIONS.TEAM.MANAGE,
+
+
+  DELETE: PERMISSIONS.TEAM.MANAGE,
+
+
+  MANAGE_MEMBERS: PERMISSIONS.TEAM.MANAGE,
+
+
+} as const;

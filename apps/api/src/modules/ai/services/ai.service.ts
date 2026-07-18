@@ -1,4 +1,4 @@
-import { PrismaClient } from '@prisma/client';
+import { PrismaClient, AIProvider as PrismaAIProvider } from '@prisma/client';
 import { AIProvider, AICompletionRequest } from '../providers/ai-provider.interface';
 import { MockAIProvider } from '../providers/mock.provider';
 
@@ -60,7 +60,7 @@ export class AIService {
         organizationId,
         userId,
         feature,
-        provider: this.provider.name,
+        provider: this.provider.name.toUpperCase() as PrismaAIProvider,
         model: response?.model || 'unknown',
         promptTokens: response?.usage?.promptTokens || 0,
         completionTokens: response?.usage?.completionTokens || 0,
