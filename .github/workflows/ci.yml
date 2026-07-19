@@ -2,9 +2,13 @@ name: AIWorkspace CI
 
 on:
   push:
-    branches: [main]
+    branches:
+      - main
+      - backup/pre-chatgpt-plus
   pull_request:
-    branches: [main]
+    branches:
+      - main
+      - backup/pre-chatgpt-plus
 
 jobs:
   build-and-test:
