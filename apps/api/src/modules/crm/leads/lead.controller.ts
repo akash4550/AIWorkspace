@@ -1,54 +1,72 @@
 import { Request, Response } from 'express';
+
+import { getValidatedRequest } from '../../../core/middlewares/validateRequest';
 import { LeadService } from './lead.service';
-import { createLeadSchema, updateLeadSchema } from './lead.validator';
+import type {
+  CreateLeadRequest,
+  DeleteLeadRequest,
+  GetLeadRequest,
+  ListLeadsRequest,
+  UpdateLeadRequest,
+} from './lead.validator';
 
 const leadService = new LeadService();
 
 export class LeadController {
   async create(req: Request, res: Response) {
-    try {
-      const dto = createLeadSchema.parse(req.body);
-      const lead = await leadService.createLead(req.user!.organizationId, req.user!.id, dto);
-      res.status(201).json({ data: lead });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { body } = getValidatedRequest<CreateLeadRequest>(req);
+
+    const lead = await leadService.createLead(
+      req.user!.organizationId,
+      req.user!.id,
+      body,
+    );
+
+    res.status(201).json({ data: lead });
   }
 
   async getAll(req: Request, res: Response) {
-    try {
-      const result = await leadService.getLeads(req.user!.organizationId, req.query);
-      res.json(result);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { query } = getValidatedRequest<ListLeadsRequest>(req);
+
+    const result = await leadService.getLeads(
+      req.user!.organizationId,
+      query,
+    );
+
+    res.json(result);
   }
 
   async getOne(req: Request, res: Response) {
-    try {
-      const lead = await leadService.getLead(req.user!.organizationId, req.params.id as string);
-      res.json({ data: lead });
-    } catch (error: any) {
-      res.status(404).json({ error: error.message });
-    }
+    const { params } = getValidatedRequest<GetLeadRequest>(req);
+
+    const lead = await leadService.getLead(
+      req.user!.organizationId,
+      params.id,
+    );
+
+    res.json({ data: lead });
   }
 
   async update(req: Request, res: Response) {
-    try {
-      const dto = updateLeadSchema.parse(req.body);
-      const lead = await leadService.updateLead(req.user!.organizationId, req.params.id as string, dto);
-      res.json({ data: lead });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { body, params } = getValidatedRequest<UpdateLeadRequest>(req);
+
+    const lead = await leadService.updateLead(
+      req.user!.organizationId,
+      params.id,
+      body,
+    );
+
+    res.json({ data: lead });
   }
 
   async delete(req: Request, res: Response) {
-    try {
-      await leadService.deleteLead(req.user!.organizationId, req.params.id as string);
-      res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { params } = getValidatedRequest<DeleteLeadRequest>(req);
+
+    await leadService.deleteLead(
+      req.user!.organizationId,
+      params.id,
+    );
+
+    res.status(204).send();
   }
 }
