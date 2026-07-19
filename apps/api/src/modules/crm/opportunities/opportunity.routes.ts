@@ -1,5 +1,18 @@
 import { Router } from 'express';
+
+import { PERMISSIONS } from '../../../core/auth/permissions';
+import { requireAuth } from '../../../core/middlewares/authMiddleware';
+import { requirePermission } from '../../../core/middlewares/rbacMiddleware';
+import { validateRequest } from '../../../core/middlewares/validateRequest';
+import { asyncWrapper } from '../../../core/utils/asyncWrapper';
 import { OpportunityController } from './opportunity.controller';
+import {
+  createOpportunitySchema,
+  deleteOpportunitySchema,
+  getOpportunitySchema,
+  listOpportunitiesSchema,
+  updateOpportunitySchema,
+} from './opportunity.validator';
 
 const router = Router();
 const controller = new OpportunityController();
@@ -11,6 +24,8 @@ const controller = new OpportunityController();
  *   description: Opportunity management
  */
 
+router.use(requireAuth);
+
 /**
  * @swagger
  * /crm/opportunities:
@@ -21,7 +36,12 @@ const controller = new OpportunityController();
  *       201:
  *         description: Opportunity created successfully
  */
-router.post('/', controller.create.bind(controller));
+router.post(
+  '/',
+  requirePermission(PERMISSIONS.CRM.WRITE),
+  validateRequest(createOpportunitySchema),
+  asyncWrapper(controller.create.bind(controller)),
+);
 
 /**
  * @swagger
@@ -33,7 +53,12 @@ router.post('/', controller.create.bind(controller));
  *       200:
  *         description: A list of opportunities
  */
-router.get('/', controller.getAll.bind(controller));
+router.get(
+  '/',
+  requirePermission(PERMISSIONS.CRM.READ),
+  validateRequest(listOpportunitiesSchema),
+  asyncWrapper(controller.getAll.bind(controller)),
+);
 
 /**
  * @swagger
@@ -47,11 +72,17 @@ router.get('/', controller.getAll.bind(controller));
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     responses:
  *       200:
  *         description: Opportunity details
  */
-router.get('/:id', controller.getOne.bind(controller));
+router.get(
+  '/:id',
+  requirePermission(PERMISSIONS.CRM.READ),
+  validateRequest(getOpportunitySchema),
+  asyncWrapper(controller.getOne.bind(controller)),
+);
 
 /**
  * @swagger
@@ -65,11 +96,17 @@ router.get('/:id', controller.getOne.bind(controller));
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     responses:
  *       200:
  *         description: Opportunity updated successfully
  */
-router.patch('/:id', controller.update.bind(controller));
+router.patch(
+  '/:id',
+  requirePermission(PERMISSIONS.CRM.WRITE),
+  validateRequest(updateOpportunitySchema),
+  asyncWrapper(controller.update.bind(controller)),
+);
 
 /**
  * @swagger
@@ -83,10 +120,16 @@ router.patch('/:id', controller.update.bind(controller));
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     responses:
  *       204:
  *         description: Opportunity deleted successfully
  */
-router.delete('/:id', controller.delete.bind(controller));
+router.delete(
+  '/:id',
+  requirePermission(PERMISSIONS.CRM.WRITE),
+  validateRequest(deleteOpportunitySchema),
+  asyncWrapper(controller.delete.bind(controller)),
+);
 
 export default router;
