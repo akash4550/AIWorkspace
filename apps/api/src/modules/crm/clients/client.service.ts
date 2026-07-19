@@ -1,6 +1,7 @@
 import { ClientRepository } from './client.repository';
 import { CreateClientDto, UpdateClientDto, ClientQueryDto } from './client.dto';
 import { eventBus } from '../../../core/events/EventBus';
+import { AppError } from '../../../core/errors/AppError';
 
 export class ClientService {
   private repository: ClientRepository;
@@ -10,7 +11,7 @@ export class ClientService {
   }
 
   async createClient(organizationId: string, createdById: string, dto: CreateClientDto) {
-    const ownerId = dto.ownerId || createdById;
+    const ownerId = dto.ownerId ?? createdById;
     const client = await this.repository.create({
       organizationId,
       ownerId,
@@ -32,24 +33,18 @@ export class ClientService {
 
   async getClient(organizationId: string, id: string) {
     const client = await this.repository.findById(organizationId, id);
-    if (!client) throw new Error('Client not found');
+    if (!client) throw new AppError('Client not found', 404);
     return client;
   }
 
   async updateClient(organizationId: string, id: string, dto: UpdateClientDto) {
-    const client = await this.repository.findById(organizationId, id);
-    if (!client) throw new Error('Client not found');
-
     const updated = await this.repository.update(id, organizationId, dto);
     eventBus.emitEvent('ClientUpdated', { organizationId, clientId: id });
     return updated;
   }
 
   async deleteClient(organizationId: string, id: string) {
-    const client = await this.repository.findById(organizationId, id);
-    if (!client) throw new Error('Client not found');
-
-    await this.repository.update(id, organizationId, { deletedAt: new Date() });
+    await this.repository.softDelete(id, organizationId, new Date());
     eventBus.emitEvent('ClientDeleted', { organizationId, clientId: id });
     return true;
   }
