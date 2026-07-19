@@ -1,54 +1,86 @@
 import { Request, Response } from 'express';
+
+import { getValidatedRequest } from '../../../core/middlewares/validateRequest';
 import { OpportunityService } from './opportunity.service';
-import { createOpportunitySchema, updateOpportunitySchema } from './opportunity.validator';
+import type {
+  CreateOpportunityRequest,
+  DeleteOpportunityRequest,
+  GetOpportunityRequest,
+  ListOpportunitiesRequest,
+  UpdateOpportunityRequest,
+} from './opportunity.validator';
 
 const opportunityService = new OpportunityService();
 
 export class OpportunityController {
   async create(req: Request, res: Response) {
-    try {
-      const dto = createOpportunitySchema.parse(req.body);
-      const opp = await opportunityService.createOpportunity(req.user!.organizationId, dto);
-      res.status(201).json({ data: opp });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { body } =
+      getValidatedRequest<CreateOpportunityRequest>(req);
+
+    const opportunity =
+      await opportunityService.createOpportunity(
+        req.user!.organizationId,
+        body,
+      );
+
+    res.status(201).json({
+      data: opportunity,
+    });
   }
 
   async getAll(req: Request, res: Response) {
-    try {
-      const result = await opportunityService.getOpportunities(req.user!.organizationId, req.query);
-      res.json(result);
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { query } =
+      getValidatedRequest<ListOpportunitiesRequest>(req);
+
+    const result =
+      await opportunityService.getOpportunities(
+        req.user!.organizationId,
+        query,
+      );
+
+    res.json(result);
   }
 
   async getOne(req: Request, res: Response) {
-    try {
-      const opp = await opportunityService.getOpportunity(req.user!.organizationId, req.params.id as string);
-      res.json({ data: opp });
-    } catch (error: any) {
-      res.status(404).json({ error: error.message });
-    }
+    const { params } =
+      getValidatedRequest<GetOpportunityRequest>(req);
+
+    const opportunity =
+      await opportunityService.getOpportunity(
+        req.user!.organizationId,
+        params.id,
+      );
+
+    res.json({
+      data: opportunity,
+    });
   }
 
   async update(req: Request, res: Response) {
-    try {
-      const dto = updateOpportunitySchema.parse(req.body);
-      const opp = await opportunityService.updateOpportunity(req.user!.organizationId, req.params.id as string, dto);
-      res.json({ data: opp });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { body, params } =
+      getValidatedRequest<UpdateOpportunityRequest>(req);
+
+    const opportunity =
+      await opportunityService.updateOpportunity(
+        req.user!.organizationId,
+        params.id,
+        body,
+      );
+
+    res.json({
+      data: opportunity,
+    });
   }
 
   async delete(req: Request, res: Response) {
-    try {
-      await opportunityService.deleteOpportunity(req.user!.organizationId, req.params.id as string);
-      res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { params } =
+      getValidatedRequest<DeleteOpportunityRequest>(req);
+
+    await opportunityService.deleteOpportunity(
+      req.user!.organizationId,
+      params.id,
+    );
+
+    res.status(204).send();
   }
 }
