@@ -105,7 +105,6 @@ plan String?
   teamInvitations TeamInvitation[]
   AIUsageLog      AIUsageLog[]
 
-  @@index([slug])
   @@index([deletedAt])
   @@index([isActive])
 }

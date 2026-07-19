@@ -6,26 +6,10 @@ export interface LoginDto {
   organizationId: string;
 }
 
-export interface RefreshTokenDto {
-  refreshToken: string;
-}
-
 export interface LoginMetadata {
   device?: string;
   ipAddress?: string;
   userAgent?: string;
-}
-
-export interface JwtAccessPayload {
-  userId: string;
-  organizationId: string;
-  role: Role;
-}
-
-export interface JwtRefreshPayload {
-  userId: string;
-  jti: string;
-  type: 'refresh';
 }
 
 export interface AuthenticatedUser {
@@ -34,19 +18,33 @@ export interface AuthenticatedUser {
   role: Role;
 }
 
-export interface LoginResponse {
+export interface CurrentSessionResponse {
   user: {
     id: string;
+    organizationId: string;
     firstName: string;
     lastName: string;
     email: string;
     role: Role;
+    avatar: string | null;
+    emailVerified: boolean;
+    lastLogin: Date | null;
+    createdAt: Date;
   };
+  organization: {
+    id: string;
+    name: string;
+    slug: string;
+    logo: string | null;
+  };
+}
+
+export interface LoginResponse extends CurrentSessionResponse {
   accessToken: string;
   refreshToken: string;
 }
 
-export interface RefreshResponse {
+export interface RefreshResponse extends CurrentSessionResponse {
   accessToken: string;
   refreshToken: string;
 }

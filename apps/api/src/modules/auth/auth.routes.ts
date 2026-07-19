@@ -12,24 +12,27 @@ import {
 } from './auth.validator';
 
 import { requireAuth } from '../../core/middlewares/authMiddleware';
+import { requireTrustedAuthOrigin } from './auth.origin';
 
 const router = Router();
 
 router.post(
   '/login',
+  requireTrustedAuthOrigin,
   validateRequest(loginSchema),
   asyncWrapper(authController.login)
 );
 
 router.post(
   '/refresh',
+  requireTrustedAuthOrigin,
   validateRequest(refreshTokenSchema),
   asyncWrapper(authController.refresh)
 );
 
 router.post(
   '/logout',
-  requireAuth,
+  requireTrustedAuthOrigin,
   validateRequest(logoutSchema),
   asyncWrapper(authController.logout)
 );

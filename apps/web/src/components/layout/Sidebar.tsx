@@ -1,14 +1,28 @@
 import { useUiStore } from '../../store/uiStore';
 import { navigationConfig } from '../../config/navigation';
-import { Link, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { LogOut } from 'lucide-react';
+
+import { useAuth } from '../../providers/AuthProvider';
 
 export const Sidebar = () => {
   const { isSidebarOpen } = useUiStore();
   const location = useLocation();
+  const navigate = useNavigate();
+  const { user, logout } = useAuth();
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
-  // In a real app with Auth implemented (Phase 4), we'd get the user role here
-  const currentUserRole = 'ADMIN'; 
+  const handleLogout = async () => {
+    setIsLoggingOut(true);
+    try {
+      await logout();
+    } catch {
+      // Local session state is cleared in all cases by the auth provider.
+    } finally {
+      navigate('/login', { replace: true });
+    }
+  };
 
   if (!isSidebarOpen) return null;
 
@@ -20,9 +34,8 @@ export const Sidebar = () => {
       
       <nav className="flex-1 p-4 space-y-1 overflow-y-auto">
         {navigationConfig.map((item) => {
-          // RBAC Check
-          if (item.roles && !item.roles.includes(currentUserRole as any)) {
-            return null; // Hide if user lacks role
+          if (item.roles && (!user || !item.roles.includes(user.role))) {
+            return null;
           }
 
           const isActive = location.pathname === item.path;
@@ -49,9 +62,14 @@ export const Sidebar = () => {
       </nav>
 
       <div className="p-4 border-t border-gray-200 dark:border-slate-700">
-        <button className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 w-full transition-colors">
+        <button
+          type="button"
+          onClick={() => void handleLogout()}
+          disabled={isLoggingOut}
+          className="flex items-center gap-3 px-3 py-2 text-sm font-medium text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-100 dark:hover:bg-slate-700 w-full transition-colors disabled:cursor-not-allowed disabled:opacity-60"
+        >
           <LogOut className="w-5 h-5" />
-          Sign Out
+          {isLoggingOut ? 'Signing Out…' : 'Sign Out'}
         </button>
       </div>
     </aside>

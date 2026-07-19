@@ -6,8 +6,15 @@
   ],
   "scripts": {
     "dev": "npm run dev --workspaces --if-present",
-    "build": "npm run build --workspaces --if-present",
-    "lint": "npm run lint --workspaces --if-present",
+    "generate": "npm run generate --workspace=api",
+    "typecheck": "npm run typecheck --workspace=api && npm run typecheck --workspace=web",
+    "build": "npm run build:api && npm run build:web",
+    "build:api": "npm run generate --workspace=api && npm run build --workspace=api",
+    "build:web": "npm run build --workspace=web",
+    "test": "npm run test --workspace=api",
+    "docker:build": "docker compose -f docker-compose.production.yml build api web",
+    "smoke:prepare-auth": "node scripts/prepare-production-auth-smoke.mjs",
+    "smoke:production": "node scripts/smoke-production.mjs",
     "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
 
     "api": "npm run dev --workspace=api",

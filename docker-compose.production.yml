@@ -1,8 +1,6 @@
 services:
   postgres:
     image: postgres:15-alpine
-    container_name: aiworkspace-postgres
-
     restart: unless-stopped
 
     environment:
@@ -25,8 +23,6 @@ services:
 
   redis:
     image: redis:7-alpine
-    container_name: aiworkspace-redis
-
     restart: unless-stopped
 
     command:
@@ -61,19 +57,21 @@ services:
       context: .
       dockerfile: apps/api/Dockerfile
 
-    container_name: aiworkspace-api
-
     restart: unless-stopped
 
     ports:
-      - "4000:4000"
+      - "${API_PORT:-4000}:4000"
 
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${DB_USER:-aiworkspace}:${DB_PASSWORD:-supersecret}@postgres:5432/${DB_NAME:-aiworkspace_prod}
       REDIS_URL: redis://:${REDIS_PASSWORD:-supersecret}@redis:6379
-      JWT_SECRET: ${JWT_SECRET}
-      FRONTEND_URL: http://localhost
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      JWT_ISSUER: ${JWT_ISSUER:-aiworkspace-api}
+      JWT_ACCESS_AUDIENCE: ${JWT_ACCESS_AUDIENCE:-aiworkspace-api}
+      JWT_REFRESH_AUDIENCE: ${JWT_REFRESH_AUDIENCE:-aiworkspace-auth}
+      FRONTEND_URL: ${FRONTEND_URL}
 
     depends_on:
       postgres:
@@ -91,12 +89,10 @@ services:
       context: .
       dockerfile: apps/web/Dockerfile
 
-    container_name: aiworkspace-web
-
     restart: unless-stopped
 
     ports:
-      - "80:80"
+      - "${WEB_PORT:-80}:80"
 
     depends_on:
       - api

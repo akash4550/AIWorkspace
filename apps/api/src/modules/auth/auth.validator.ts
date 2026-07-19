@@ -1,30 +1,18 @@
 import { z } from 'zod';
 
+export const loginBodySchema = z.object({
+  email: z.string().trim().email('Invalid email address'),
+  password: z.string().min(8, 'Password must be at least 8 characters'),
+  organizationId: z.string().uuid('Organization ID must be a valid UUID'),
+}).strict();
+
 export const loginSchema = z.object({
-  body: z.object({
-    email: z
-      .string()
-      .trim()
-      .email('Invalid email address'),
-
-    password: z
-      .string()
-      .min(8, 'Password must be at least 8 characters'),
-  }),
+  body: loginBodySchema,
 });
 
-export const refreshTokenSchema = z.object({
-  body: z.object({
-    refreshToken: z
-      .string()
-      .min(1, 'Refresh token is required'),
-  }),
+const cookieAuthRequestSchema = z.object({
+  body: z.object({}).strict().optional(),
 });
 
-export const logoutSchema = z.object({
-  body: z.object({
-    refreshToken: z
-      .string()
-      .min(1, 'Refresh token is required'),
-  }),
-});
+export const refreshTokenSchema = cookieAuthRequestSchema;
+export const logoutSchema = cookieAuthRequestSchema;

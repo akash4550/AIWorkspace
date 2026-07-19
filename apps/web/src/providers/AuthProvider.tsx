@@ -1,0 +1,166 @@
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type ReactNode,
+} from 'react';
+import { useQueryClient } from '@tanstack/react-query';
+
+import type {
+  AuthOrganization,
+  AuthSession,
+  AuthStatus,
+  AuthUser,
+  LoginCredentials,
+} from '../features/auth/auth.types';
+import {
+  currentSessionRequest,
+  loginRequest,
+  logoutRequest,
+  refreshSessionRequest,
+  registerAuthCoordinator,
+} from '../lib/api';
+import { useRealtimeStore } from '../stores/useRealtimeStore';
+
+interface AuthContextValue {
+  status: AuthStatus;
+  accessToken: string | null;
+  user: AuthUser | null;
+  organization: AuthOrganization | null;
+  login: (credentials: LoginCredentials) => Promise<void>;
+  logout: () => Promise<void>;
+  clearSession: () => void;
+}
+
+const AuthContext = createContext<AuthContextValue | null>(null);
+const obsoleteAuthStorageKeys = ['mock_admin_id', 'aiworkspace_token'];
+
+const removeObsoleteAuthStorage = (): void => {
+  for (const storageName of ['localStorage', 'sessionStorage'] as const) {
+    try {
+      const storage = window[storageName];
+      for (const key of obsoleteAuthStorageKeys) {
+        storage.removeItem(key);
+      }
+    } catch {
+      // Unavailable browser storage must not prevent cookie-based authentication.
+    }
+  }
+};
+
+export const AuthProvider = ({ children }: { children: ReactNode }) => {
+  const queryClient = useQueryClient();
+  const [status, setStatus] = useState<AuthStatus>('initializing');
+  const [accessToken, setAccessToken] = useState<string | null>(null);
+  const [session, setSession] = useState<AuthSession | null>(null);
+  const accessTokenRef = useRef<string | null>(null);
+  const sessionRef = useRef<AuthSession | null>(null);
+  const refreshSessionRef = useRef<Promise<string> | null>(null);
+  const sessionGenerationRef = useRef(0);
+
+  const clearTenantState = useCallback(() => {
+    queryClient.clear();
+    useRealtimeStore.getState().reset();
+  }, [queryClient]);
+
+  const clearSession = useCallback(() => {
+    sessionGenerationRef.current += 1;
+    accessTokenRef.current = null;
+    sessionRef.current = null;
+    setAccessToken(null);
+    setSession(null);
+    setStatus('unauthenticated');
+    clearTenantState();
+    removeObsoleteAuthStorage();
+  }, [clearTenantState]);
+
+  const establishSession = useCallback((nextSession: AuthSession, token: string) => {
+    const previousSession = sessionRef.current;
+    const identityChanged = previousSession !== null && (
+      previousSession.user.id !== nextSession.user.id ||
+      previousSession.organization.id !== nextSession.organization.id
+    );
+
+    if (identityChanged) {
+      clearTenantState();
+    }
+
+    accessTokenRef.current = token;
+    sessionRef.current = nextSession;
+    setAccessToken(token);
+    setSession(nextSession);
+    setStatus('authenticated');
+  }, [clearTenantState]);
+
+  const refreshSession = useCallback((): Promise<string> => {
+    if (!refreshSessionRef.current) {
+      const sessionGeneration = sessionGenerationRef.current;
+      refreshSessionRef.current = (async () => {
+        const refreshed = await refreshSessionRequest();
+        const authoritativeSession = await currentSessionRequest(refreshed.accessToken);
+        if (sessionGeneration !== sessionGenerationRef.current) {
+          throw new Error('Session changed during refresh');
+        }
+        establishSession(authoritativeSession, refreshed.accessToken);
+        return refreshed.accessToken;
+      })().finally(() => {
+        refreshSessionRef.current = null;
+      });
+    }
+
+    return refreshSessionRef.current;
+  }, [establishSession]);
+
+  const login = useCallback(async (credentials: LoginCredentials): Promise<void> => {
+    const result = await loginRequest({
+      ...credentials,
+      email: credentials.email.trim().toLowerCase(),
+    });
+    const authoritativeSession = await currentSessionRequest(result.accessToken);
+    clearTenantState();
+    establishSession(authoritativeSession, result.accessToken);
+  }, [clearTenantState, establishSession]);
+
+  const logout = useCallback(async (): Promise<void> => {
+    clearSession();
+    await logoutRequest();
+  }, [clearSession]);
+
+  useEffect(() => registerAuthCoordinator({
+    getAccessToken: () => accessTokenRef.current,
+    refreshSession,
+    clearSession,
+  }), [clearSession, refreshSession]);
+
+  useEffect(() => {
+    removeObsoleteAuthStorage();
+    void refreshSession().catch(() => {
+      clearSession();
+    });
+  }, [clearSession, refreshSession]);
+
+  const value = useMemo<AuthContextValue>(() => ({
+    status,
+    accessToken,
+    user: session?.user ?? null,
+    organization: session?.organization ?? null,
+    login,
+    logout,
+    clearSession,
+  }), [accessToken, clearSession, login, logout, session, status]);
+
+  return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;
+};
+
+export const useAuth = (): AuthContextValue => {
+  const context = useContext(AuthContext);
+  if (!context) {
+    throw new Error('useAuth must be used within an AuthProvider');
+  }
+
+  return context;
+};

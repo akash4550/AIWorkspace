@@ -1,76 +1,68 @@
-import { Request, Response, NextFunction } from 'express';
+import { NextFunction, Request, Response } from 'express';
 
-import { AuthService } from './auth.service';
 import { AppError } from '../../core/errors/AppError';
-
-import { prisma } from '../../config/prisma';
-
-const authService = new AuthService();
+import { authService } from './auth.service';
+import { loginBodySchema } from './auth.validator';
+import {
+  clearRefreshCookie,
+  readRefreshCookie,
+  setRefreshCookie,
+} from './auth.cookie';
 
 export class AuthController {
-  login = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) => {
+  login = async (req: Request, res: Response, next: NextFunction) => {
     try {
-      const { email, password, organizationId } = req.body;
+      const input = loginBodySchema.parse(req.body);
+      const result = await authService.login(input, {
+        device: req.headers['x-device-name'] as string | undefined,
+        ipAddress: req.ip,
+        userAgent: req.headers['user-agent'],
+      });
+      const { refreshToken, ...browserSession } = result;
+      setRefreshCookie(res, refreshToken);
 
-      if (!email || !password) {
-        throw new AppError(
-          'Email and password are required',
-          400
-        );
+      res.status(200).json({
+        success: true,
+        data: browserSession,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  refresh = async (req: Request, res: Response, next: NextFunction) => {
+    try {
+      const refreshToken = readRefreshCookie(req);
+      if (!refreshToken) {
+        throw new AppError('Invalid or expired refresh token', 401);
       }
+      const result = await authService.refreshToken(refreshToken);
+      const { refreshToken: rotatedRefreshToken, ...browserSession } = result;
+      setRefreshCookie(res, rotatedRefreshToken);
 
-      const result = await authService.login(
-        { email, password, organizationId },
-        {
-          device: req.headers['x-device-name'] as string | undefined,
-          ipAddress: req.ip,
-          userAgent: req.headers['user-agent'],
+      res.status(200).json({
+        success: true,
+        data: browserSession,
+      });
+    } catch (error) {
+      next(error);
+    }
+  };
+
+  logout = async (req: Request, res: Response, next: NextFunction) => {
+    const refreshToken = readRefreshCookie(req);
+    clearRefreshCookie(res);
+
+    try {
+      if (refreshToken) {
+        try {
+          await authService.logout(refreshToken);
+        } catch (error) {
+          if (!(error instanceof AppError && error.statusCode === 401)) {
+            throw error;
+          }
         }
-      );
-
-      res.status(200).json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  refresh = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { refreshToken } = req.body;
-
-      const result = await authService.refreshToken(
-        refreshToken
-      );
-
-      res.status(200).json({
-        success: true,
-        data: result,
-      });
-    } catch (error) {
-      next(error);
-    }
-  };
-
-  logout = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) => {
-    try {
-      const { refreshToken } = req.body;
-
-      await authService.logout(refreshToken);
+      }
 
       res.status(200).json({
         success: true,
@@ -81,42 +73,20 @@ export class AuthController {
     }
   };
 
-  me = async (
-    req: Request,
-    res: Response,
-    next: NextFunction
-  ) => {
+  me = async (req: Request, res: Response, next: NextFunction) => {
     try {
       if (!req.user) {
-        throw new AppError('Unauthorized', 401);
+        throw new AppError('Invalid or expired access token', 401);
       }
 
-      const user = await prisma.user.findUnique({
-        where: {
-          id: req.user.id,
-        },
-        select: {
-          id: true,
-          organizationId: true,
-          firstName: true,
-          lastName: true,
-          email: true,
-          role: true,
-          avatar: true,
-          isActive: true,
-          emailVerified: true,
-          lastLogin: true,
-          createdAt: true,
-        },
-      });
-
-      if (!user) {
-        throw new AppError('User not found', 404);
-      }
+      const session = await authService.getCurrentSession(
+        req.user.id,
+        req.user.organizationId,
+      );
 
       res.status(200).json({
         success: true,
-        data: user,
+        data: session,
       });
     } catch (error) {
       next(error);
