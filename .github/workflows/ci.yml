@@ -1,122 +1,107 @@
-name: AIWorkspace CI/CD
+name: AIWorkspace CI
 
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
+    branches: [main]
 
 jobs:
-  lint-and-typecheck:
+  build-and-test:
     runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          
-      - name: Install dependencies
-        run: npm ci
-
-      # Generate Prisma Client so types are available
-      - name: Generate Prisma Client
-        run: npm run generate -w apps/api
-        
-      - name: Lint API
-        run: npm run lint -w apps/api --if-present
-        
-      - name: Lint Web
-        run: npm run lint -w apps/web --if-present
-
-      - name: Typecheck API
-        run: npx tsc --noEmit -p apps/api/tsconfig.json
-
-      - name: Typecheck Web
-        run: npx tsc --noEmit -p apps/web/tsconfig.json
-
-  test:
-    runs-on: ubuntu-latest
-    needs: lint-and-typecheck
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate Prisma Client
-        run: npm run generate -w apps/api
-
-      - name: Run API Tests
-        run: npm run test -w apps/api --if-present
-        
-      - name: Run Web Tests
-        run: npm run test -w apps/web --if-present
-
-  build:
-    runs-on: ubuntu-latest
-    needs: test
-    steps:
-      - uses: actions/checkout@v4
-      
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '20'
-          cache: 'npm'
-          
-      - name: Install dependencies
-        run: npm ci
-
-      - name: Generate Prisma Client
-        run: npm run generate -w apps/api
-
-      - name: Build API
-        run: npm run build -w apps/api
-        
-      - name: Build Web
-        run: npm run build -w apps/web
+    services:
+      postgres:
+        image: postgres:15-alpine
         env:
-          NODE_ENV: production
-
-  docker:
-    runs-on: ubuntu-latest
-    needs: build
-    if: github.ref == 'refs/heads/main'
+          POSTGRES_USER: aiworkspace_test
+          POSTGRES_PASSWORD: aiworkspace_test
+          POSTGRES_DB: aiworkspace_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U aiworkspace_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    env:
+      NODE_ENV: test
+      DATABASE_URL: postgresql://aiworkspace_test:aiworkspace_test@127.0.0.1:5432/aiworkspace_test
+      AUTH_TEST_DATABASE_URL: postgresql://aiworkspace_test:aiworkspace_test@127.0.0.1:5432/aiworkspace_test
+      JWT_ACCESS_SECRET: ci-access-token-secret-change-me-now
+      JWT_REFRESH_SECRET: ci-refresh-token-secret-change-me-now
+      JWT_ISSUER: aiworkspace-api
+      JWT_ACCESS_AUDIENCE: aiworkspace-api
+      JWT_REFRESH_AUDIENCE: aiworkspace-auth
+      FRONTEND_URL: http://localhost:5173
     steps:
       - uses: actions/checkout@v4
-      
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-        
-      # Replace this with your actual registry (e.g. AWS ECR, Docker Hub)
-      # - name: Login to Container Registry
-      #   uses: docker/login-action@v3
-      #   with:
-      #     registry: ghcr.io
-      #     username: ${{ github.actor }}
-      #     password: ${{ secrets.GITHUB_TOKEN }}
-          
-      - name: Build API Image
-        uses: docker/build-push-action@v5
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          context: .
-          file: ./apps/api/Dockerfile
-          push: false # Set to true in real deployment
-          tags: aiworkspace-api:latest
-          
-      - name: Build Web Image
-        uses: docker/build-push-action@v5
+          node-version: '22'
+          cache: npm
+
+      - name: Install dependencies from lockfile
+        run: npm ci
+
+      - name: Generate Prisma client
+        run: npm run generate
+
+      - name: Prepare authentication integration database
+        run: |
+          PGPASSWORD=aiworkspace_test psql -h 127.0.0.1 -U aiworkspace_test -d aiworkspace_test -c "CREATE EXTENSION IF NOT EXISTS citext;"
+          npm exec --workspace=api -- prisma db push --skip-generate --accept-data-loss
+
+      - name: Type-check workspaces with their declared compilers
+        run: npm run typecheck
+
+      - name: Run API tests
+        run: npm test
+
+      - name: Run frontend authentication tests
+        run: npm run test --workspace=web
+
+      - name: Build production application artifacts
+        run: npm run build
+
+  production-smoke:
+    runs-on: ubuntu-latest
+    needs: build-and-test
+    env:
+      COMPOSE_PROJECT_NAME: aiworkspace-ci
+      API_PORT: '14000'
+      WEB_PORT: '18080'
+      SMOKE_WEB_URL: http://127.0.0.1:18080
+      JWT_ACCESS_SECRET: ci-production-access-secret-change-me
+      JWT_REFRESH_SECRET: ci-production-refresh-secret-change-me
+      FRONTEND_URL: http://127.0.0.1:18080
+      DB_PASSWORD: ci-postgres-password
+      REDIS_PASSWORD: ci-redis-password
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
         with:
-          context: .
-          file: ./apps/web/Dockerfile
-          push: false # Set to true in real deployment
-          tags: aiworkspace-web:latest
+          node-version: '22'
+
+      - name: Build production Docker images
+        run: npm run docker:build
+
+      - name: Start isolated production topology
+        run: docker compose -f docker-compose.production.yml up -d --no-build
+
+      - name: Prepare isolated production authentication fixture
+        run: npm run smoke:prepare-auth
+
+      - name: Validate production startup and routing
+        run: npm run smoke:production
+
+      - name: Show production logs on failure
+        if: failure()
+        run: docker compose -f docker-compose.production.yml logs --no-color
+
+      - name: Stop isolated production topology
+        if: always()
+        run: docker compose -f docker-compose.production.yml down -v

@@ -10,8 +10,11 @@ import { validateRequest } from '../../core/middlewares/validateRequest';
 
 import {
   createUserSchema,
+  updateOwnProfileSchema,
   updateUserSchema,
+  updateUserRoleSchema,
   updateUserStatusSchema,
+  deleteUserSchema,
   getUserSchema,
   listUsersSchema,
 } from './user.validator';
@@ -85,6 +88,21 @@ router.post(
 
 router.patch(
 
+  '/me',
+
+  validateRequest(updateOwnProfileSchema),
+
+  controller.updateOwnProfile
+
+);
+
+
+
+
+
+
+router.patch(
+
   '/:id',
 
   requirePermission(PERMISSIONS.USER.UPDATE),
@@ -94,6 +112,23 @@ router.patch(
   controller.updateUser
 
 );
+
+
+
+
+
+router.patch(
+
+  '/:id/role',
+
+  requirePermission(PERMISSIONS.USER.UPDATE),
+
+  validateRequest(updateUserRoleSchema),
+
+  controller.updateUserRole
+
+);
+
 
 
 
@@ -120,6 +155,8 @@ router.delete(
   '/:id',
 
   requirePermission(PERMISSIONS.USER.DELETE),
+
+  validateRequest(deleteUserSchema),
 
   controller.deleteUser
 

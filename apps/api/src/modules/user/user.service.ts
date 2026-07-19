@@ -6,11 +6,21 @@ import { UserRepository } from './user.repository';
 
 import {
   CreateUserDto,
-  UpdateUserDto,
+  UserProfileUpdateDto,
   UserQueryDto,
+  UserRoleUpdateDto,
+  UserStatusUpdateDto,
+  UserUpdateActor,
 } from './user.dto';
 
 import { AppError } from '../../core/errors/AppError';
+
+const ROLE_RANK: Record<Role, number> = {
+  [Role.EMPLOYEE]: 0,
+  [Role.MANAGER]: 1,
+  [Role.ADMIN]: 2,
+  [Role.SUPER_ADMIN]: 3,
+};
 
 
 
@@ -25,6 +35,30 @@ export class UserService {
 
     this.repository = new UserRepository();
 
+  }
+
+  private assertAdministrativeActor(actor: UserUpdateActor): void {
+    if (ROLE_RANK[actor.role] < ROLE_RANK[Role.ADMIN]) {
+      throw new AppError('Forbidden - Insufficient permissions', 403);
+    }
+  }
+
+  private async getAdministrativeTarget(
+    actor: UserUpdateActor,
+    userId: string,
+  ) {
+    this.assertAdministrativeActor(actor);
+    const target = await this.repository.findById(userId, actor.organizationId);
+
+    if (!target) {
+      throw new AppError('User not found', 404);
+    }
+
+    if (ROLE_RANK[target.role] > ROLE_RANK[actor.role]) {
+      throw new AppError('Forbidden - role hierarchy violation', 403);
+    }
+
+    return target;
   }
 
 
@@ -248,25 +282,20 @@ export class UserService {
 
 
 
-  async updateUser(
-    organizationId: string,
-    userId: string,
-    data: UpdateUserDto
+  async updateOwnProfile(
+    actor: UserUpdateActor,
+    data: UserProfileUpdateDto,
   ) {
 
 
-    const exists =
-      await this.repository.exists(
-
-        userId,
-
-        organizationId
-
-      );
+    const target = await this.repository.findById(
+      actor.id,
+      actor.organizationId,
+    );
 
 
 
-    if (!exists) {
+    if (!target) {
 
       throw new AppError(
 
@@ -280,15 +309,11 @@ export class UserService {
 
 
 
-    return this.repository.update(
-
-      userId,
-
-      organizationId,
-
-      data
-
-    );
+    return this.repository.updateProfile({
+      id: target.id,
+      organizationId: actor.organizationId,
+      expectedRole: target.role,
+    }, data);
 
   }
 
@@ -300,51 +325,71 @@ export class UserService {
 
 
 
-  async updateUserStatus(
-    organizationId: string,
+  async updateUserProfile(
+    actor: UserUpdateActor,
     userId: string,
-    isActive: boolean
+    data: UserProfileUpdateDto,
+  ) {
+    const target = await this.getAdministrativeTarget(actor, userId);
+
+    return this.repository.updateProfile({
+      id: target.id,
+      organizationId: actor.organizationId,
+      expectedRole: target.role,
+    }, data);
+  }
+
+  async updateUserRole(
+    actor: UserUpdateActor,
+    userId: string,
+    data: UserRoleUpdateDto,
+  ) {
+    this.assertAdministrativeActor(actor);
+    if (actor.id === userId) {
+      throw new AppError('Users cannot change their own role', 403);
+    }
+
+    const target = await this.getAdministrativeTarget(actor, userId);
+    if (ROLE_RANK[data.role] > ROLE_RANK[actor.role]) {
+      throw new AppError('Forbidden - role hierarchy violation', 403);
+    }
+
+    if (target.role === data.role) {
+      return target;
+    }
+
+    return this.repository.updateRole({
+      id: target.id,
+      organizationId: actor.organizationId,
+      expectedRole: target.role,
+      actorId: actor.id,
+      role: data.role,
+    });
+  }
+
+  async updateUserStatus(
+    actor: UserUpdateActor,
+    userId: string,
+    data: UserStatusUpdateDto,
   ) {
 
 
-    const exists =
-      await this.repository.exists(
+    this.assertAdministrativeActor(actor);
 
-        userId,
-
-        organizationId
-
-      );
-
-
-
-    if (!exists) {
-
+    if (actor.id === userId) {
       throw new AppError(
-
-        'User not found',
-
-        404
-
+        'Administrators cannot change their own status',
+        403,
       );
-
     }
 
+    const target = await this.getAdministrativeTarget(actor, userId);
 
-
-    return this.repository.update(
-
-      userId,
-
-      organizationId,
-
-      {
-
-        isActive,
-
-      }
-
-    );
+    return this.repository.updateStatus({
+      id: target.id,
+      organizationId: actor.organizationId,
+      expectedRole: target.role,
+    }, data.isActive);
 
   }
 
@@ -357,43 +402,31 @@ export class UserService {
 
 
   async deleteUser(
-    organizationId: string,
+    actor: UserUpdateActor,
     userId: string
   ) {
 
 
-    const exists =
-      await this.repository.exists(
+    this.assertAdministrativeActor(actor);
 
-        userId,
-
-        organizationId
-
-      );
-
-
-
-    if (!exists) {
-
+    if (actor.id === userId) {
       throw new AppError(
-
-        'User not found',
-
-        404
-
+        'Administrators cannot delete themselves',
+        403,
       );
-
     }
 
 
 
-    return this.repository.softDelete(
+    const target = await this.getAdministrativeTarget(actor, userId);
 
-      userId,
 
-      organizationId
 
-    );
+    return this.repository.softDelete({
+      id: target.id,
+      organizationId: actor.organizationId,
+      expectedRole: target.role,
+    });
 
   }
 

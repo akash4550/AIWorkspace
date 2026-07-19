@@ -1,5 +1,6 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
@@ -19,8 +20,6 @@ import pipelineRoutes from './modules/crm/pipeline/pipeline.routes';
 import activityRoutes from './modules/crm/activities/activity.routes';
 import analyticsRoutes from './modules/analytics/analytics.routes';
 import jobsRoutes from './modules/jobs/jobs.routes';
-import { requireAuth } from './core/middlewares/authMiddleware';
-
 import swaggerUi from 'swagger-ui-express';
 import swaggerJsdoc from 'swagger-jsdoc';
 import { startWorkers } from './modules/jobs/workers';
@@ -31,9 +30,15 @@ import systemRoutes from './modules/system/system.routes';
 import aiRoutes from './modules/ai/ai.routes';
 
 import searchRoutes from './modules/search/search.routes';
+import authRoutes from './modules/auth/auth.routes';
+import { env } from './config/env';
 
 
 const app: Application = express();
+
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // Security and utility middlewares
 app.use(helmet());
@@ -48,7 +53,11 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-app.use(cors());
+app.use(cors({
+  origin: env.FRONTEND_URL,
+  credentials: true,
+}));
+app.use(cookieParser());
 app.use(express.json());
 app.use(morgan('combined', {
     stream: { write: (message) => logger.info(message.trim()) }
@@ -97,7 +106,7 @@ app.use('/api/v1/system', systemRoutes);
 // Apply tenant isolation middleware to all routes after auth
 
 // API Routes
-// app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/organizations', organizationRoutes);
 app.use('/api/v1/projects', projectRoutes);

@@ -1,4 +1,4 @@
-import { Prisma, User } from '@prisma/client';
+import { ActivityType, EntityType, Prisma, Role, User } from '@prisma/client';
 
 import { prisma } from '../../config/prisma';
 
@@ -16,6 +16,23 @@ const userSafeSelect = {
   createdAt: true,
   updatedAt: true,
 } satisfies Prisma.UserSelect;
+
+export interface UserMutationBoundary {
+  id: string;
+  organizationId: string;
+  expectedRole: Role;
+}
+
+export interface UserProfileUpdateInput {
+  firstName?: string;
+  lastName?: string;
+  avatar?: string | null;
+}
+
+export interface UserRoleChangeInput extends UserMutationBoundary {
+  actorId: string;
+  role: Role;
+}
 
 
 
@@ -257,31 +274,71 @@ export class UserRepository {
 
 
 
-  async update(
-    id: string,
-    organizationId: string,
-    data: Prisma.UserUpdateInput
+  async updateProfile(
+    boundary: UserMutationBoundary,
+    data: UserProfileUpdateInput,
   ) {
-
-
     return prisma.user.update({
-
       where: {
-
-        id,
-
-        organizationId,
-
+        id: boundary.id,
+        organizationId: boundary.organizationId,
+        role: boundary.expectedRole,
+        deletedAt: null,
       },
-
-
-      data,
-
-
+      data: {
+        ...(data.firstName !== undefined ? { firstName: data.firstName } : {}),
+        ...(data.lastName !== undefined ? { lastName: data.lastName } : {}),
+        ...(data.avatar !== undefined ? { avatar: data.avatar } : {}),
+      },
       select: userSafeSelect,
-
     });
+  }
 
+  async updateStatus(
+    boundary: UserMutationBoundary,
+    isActive: boolean,
+  ) {
+    return prisma.user.update({
+      where: {
+        id: boundary.id,
+        organizationId: boundary.organizationId,
+        role: boundary.expectedRole,
+        deletedAt: null,
+      },
+      data: { isActive },
+      select: userSafeSelect,
+    });
+  }
+
+  async updateRole(input: UserRoleChangeInput) {
+    return prisma.$transaction(async (transaction) => {
+      const updatedUser = await transaction.user.update({
+        where: {
+          id: input.id,
+          organizationId: input.organizationId,
+          role: input.expectedRole,
+          deletedAt: null,
+        },
+        data: { role: input.role },
+        select: userSafeSelect,
+      });
+
+      await transaction.activityLog.create({
+        data: {
+          organizationId: input.organizationId,
+          userId: input.actorId,
+          type: ActivityType.UPDATE,
+          entityType: EntityType.USER,
+          entityId: input.id,
+          metadata: {
+            previousRole: input.expectedRole,
+            newRole: input.role,
+          },
+        },
+      });
+
+      return updatedUser;
+    });
   }
 
 
@@ -291,8 +348,7 @@ export class UserRepository {
 
 
   async softDelete(
-    id: string,
-    organizationId: string
+    boundary: UserMutationBoundary,
   ) {
 
 
@@ -300,9 +356,13 @@ export class UserRepository {
 
       where: {
 
-        id,
+        id: boundary.id,
 
-        organizationId,
+        organizationId: boundary.organizationId,
+
+        role: boundary.expectedRole,
+
+        deletedAt: null,
 
       },
 

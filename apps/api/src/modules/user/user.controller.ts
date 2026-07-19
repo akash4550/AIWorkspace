@@ -3,6 +3,14 @@ import { Request, Response } from 'express';
 import { UserService } from './user.service';
 
 import { asyncWrapper } from '../../core/utils/asyncWrapper';
+import { getValidatedRequest } from '../../core/middlewares/validateRequest';
+import {
+  DeleteUserRequest,
+  UpdateOwnProfileRequest,
+  UpdateUserRequest,
+  UpdateUserRoleRequest,
+  UpdateUserStatusRequest,
+} from './user.validator';
 
 
 
@@ -151,6 +159,48 @@ export class UserController {
 
 
 
+  updateOwnProfile = asyncWrapper(
+
+    async (
+      req: Request,
+      res: Response
+    ) => {
+
+
+      const { body } =
+        getValidatedRequest<UpdateOwnProfileRequest>(req);
+
+
+
+      const user =
+        await this.service.updateOwnProfile(
+
+          req.user!,
+
+          body
+
+        );
+
+
+
+      res.status(200).json({
+
+        success: true,
+
+        data: user,
+
+      });
+
+    }
+
+  );
+
+
+
+
+
+
+
   updateUser = asyncWrapper(
 
     async (
@@ -159,24 +209,63 @@ export class UserController {
     ) => {
 
 
-      const organizationId =
-        req.user!.organizationId;
-
-
-
-      const userId =
-        String(req.params.id);
+      const { params, body } =
+        getValidatedRequest<UpdateUserRequest>(req);
 
 
 
       const user =
-        await this.service.updateUser(
+        await this.service.updateUserProfile(
 
-          organizationId,
+          req.user!,
 
-          userId,
+          params.id,
 
-          req.body
+          body
+
+        );
+
+
+
+      res.status(200).json({
+
+        success: true,
+
+        data: user,
+
+      });
+
+    }
+
+  );
+
+
+
+
+
+
+
+  updateUserRole = asyncWrapper(
+
+    async (
+      req: Request,
+      res: Response
+    ) => {
+
+
+      const { params, body } =
+        getValidatedRequest<UpdateUserRoleRequest>(req);
+
+
+
+      const user =
+        await this.service.updateUserRole(
+
+          req.user!,
+
+          params.id,
+
+          body
 
         );
 
@@ -208,24 +297,19 @@ export class UserController {
     ) => {
 
 
-      const organizationId =
-        req.user!.organizationId;
-
-
-
-      const userId =
-        String(req.params.id);
+      const { params, body } =
+        getValidatedRequest<UpdateUserStatusRequest>(req);
 
 
 
       const user =
         await this.service.updateUserStatus(
 
-          organizationId,
+          req.user!,
 
-          userId,
+          params.id,
 
-          req.body.isActive
+          body
 
         );
 
@@ -257,21 +341,16 @@ export class UserController {
     ) => {
 
 
-      const organizationId =
-        req.user!.organizationId;
-
-
-
-      const userId =
-        String(req.params.id);
+      const { params } =
+        getValidatedRequest<DeleteUserRequest>(req);
 
 
 
       await this.service.deleteUser(
 
-        organizationId,
+        req.user!,
 
-        userId
+        params.id
 
       );
 
