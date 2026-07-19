@@ -65,6 +65,7 @@ services:
     environment:
       NODE_ENV: production
       DATABASE_URL: postgresql://${DB_USER:-aiworkspace}:${DB_PASSWORD:-supersecret}@postgres:5432/${DB_NAME:-aiworkspace_prod}
+      DIRECT_DATABASE_URL: postgresql://${DB_USER:-aiworkspace}:${DB_PASSWORD:-supersecret}@postgres:5432/${DB_NAME:-aiworkspace_prod}
       REDIS_URL: redis://:${REDIS_PASSWORD:-supersecret}@redis:6379
       JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
