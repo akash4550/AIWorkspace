@@ -1,64 +1,84 @@
 import { Request, Response } from 'express';
+
+import { getValidatedRequest } from '../../../core/middlewares/validateRequest';
 import { PipelineStageService } from './pipeline.service';
-import { createPipelineStageSchema, updatePipelineStageSchema, reorderStagesSchema } from './pipeline.validator';
+import type {
+  CreatePipelineStageRequest,
+  DeletePipelineStageRequest,
+  GetPipelineStageRequest,
+  ReorderPipelineStagesRequest,
+  UpdatePipelineStageRequest,
+} from './pipeline.validator';
 
 const pipelineService = new PipelineStageService();
 
 export class PipelineStageController {
   async create(req: Request, res: Response) {
-    try {
-      const dto = createPipelineStageSchema.parse(req.body);
-      const stage = await pipelineService.createStage(req.user!.organizationId, dto);
-      res.status(201).json({ data: stage });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { body } =
+      getValidatedRequest<CreatePipelineStageRequest>(req);
+
+    const stage = await pipelineService.createStage(
+      req.user!.organizationId,
+      body,
+    );
+
+    res.status(201).json({ data: stage });
   }
 
   async getAll(req: Request, res: Response) {
-    try {
-      const stages = await pipelineService.getStages(req.user!.organizationId);
-      res.json({ data: stages });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const stages = await pipelineService.getStages(
+      req.user!.organizationId,
+    );
+
+    res.json({ data: stages });
   }
 
   async getOne(req: Request, res: Response) {
-    try {
-      const stage = await pipelineService.getStage(req.user!.organizationId, req.params.id as string);
-      res.json({ data: stage });
-    } catch (error: any) {
-      res.status(404).json({ error: error.message });
-    }
+    const { params } =
+      getValidatedRequest<GetPipelineStageRequest>(req);
+
+    const stage = await pipelineService.getStage(
+      req.user!.organizationId,
+      params.id,
+    );
+
+    res.json({ data: stage });
   }
 
   async update(req: Request, res: Response) {
-    try {
-      const dto = updatePipelineStageSchema.parse(req.body);
-      const stage = await pipelineService.updateStage(req.user!.organizationId, req.params.id as string, dto);
-      res.json({ data: stage });
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { body, params } =
+      getValidatedRequest<UpdatePipelineStageRequest>(req);
+
+    const stage = await pipelineService.updateStage(
+      req.user!.organizationId,
+      params.id,
+      body,
+    );
+
+    res.json({ data: stage });
   }
 
   async delete(req: Request, res: Response) {
-    try {
-      await pipelineService.deleteStage(req.user!.organizationId, req.params.id as string);
-      res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { params } =
+      getValidatedRequest<DeletePipelineStageRequest>(req);
+
+    await pipelineService.deleteStage(
+      req.user!.organizationId,
+      params.id,
+    );
+
+    res.status(204).send();
   }
 
   async reorder(req: Request, res: Response) {
-    try {
-      const dto = reorderStagesSchema.parse(req.body);
-      await pipelineService.reorderStages(req.user!.organizationId, dto);
-      res.status(204).send();
-    } catch (error: any) {
-      res.status(400).json({ error: error.message });
-    }
+    const { body } =
+      getValidatedRequest<ReorderPipelineStagesRequest>(req);
+
+    await pipelineService.reorderStages(
+      req.user!.organizationId,
+      body,
+    );
+
+    res.status(204).send();
   }
 }
