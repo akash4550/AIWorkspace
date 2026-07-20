@@ -1,63 +1,124 @@
+import { AppError } from '../../core/errors/AppError';
+import {
+  MetricFilterDto,
+  ReportType,
+} from './analytics.dto';
 import { AnalyticsRepository } from './analytics.repository';
-import { KPIEngine } from './kpi.engine';
-import { MetricFilterDto, ReportType } from './analytics.dto';
 import { ReportDefinition } from './analytics.types';
+import { KPIEngine } from './kpi.engine';
 
 export class AnalyticsService {
+  private repository: AnalyticsRepository;
   private kpiEngine: KPIEngine;
 
-  // Pre-defined reports that dictate which metrics are aggregated together
   private reports: Record<string, ReportDefinition> = {
     [ReportType.EXECUTIVE_SUMMARY]: {
       type: ReportType.EXECUTIVE_SUMMARY,
       title: 'Executive Summary',
-      description: 'High-level overview of organization health',
-      metrics: ['ACTIVE_USERS', 'NEW_USERS', 'PROJECTS_CREATED', 'PIPELINE_VALUE'],
+      description:
+        'High-level overview of organization health',
+      metrics: [
+        'ACTIVE_USERS',
+        'NEW_USERS',
+        'PROJECTS_CREATED',
+        'PIPELINE_VALUE',
+      ],
     },
+
     [ReportType.PROJECT_HEALTH]: {
       type: ReportType.PROJECT_HEALTH,
       title: 'Project Health',
       description: 'Task completion and velocity',
-      metrics: ['ACTIVE_PROJECTS', 'TASKS_CREATED', 'TASKS_COMPLETED', 'TASK_COMPLETION_RATE', 'OVERDUE_TASKS', 'TASK_STATUS_DISTRIBUTION'],
+      metrics: [
+        'ACTIVE_PROJECTS',
+        'TASKS_CREATED',
+        'TASKS_COMPLETED',
+        'TASK_COMPLETION_RATE',
+        'OVERDUE_TASKS',
+        'TASK_STATUS_DISTRIBUTION',
+      ],
     },
+
     [ReportType.CRM_OVERVIEW]: {
       type: ReportType.CRM_OVERVIEW,
       title: 'CRM Overview',
-      description: 'Lead generation and sales pipeline',
-      metrics: ['LEADS_CREATED', 'PIPELINE_VALUE', 'WIN_RATE'],
+      description:
+        'Lead generation and sales pipeline',
+      metrics: [
+        'LEADS_CREATED',
+        'PIPELINE_VALUE',
+        'WIN_RATE',
+      ],
     },
   };
 
   constructor() {
-    // In a real dependency injection setup, these would be injected
-    const repository = new AnalyticsRepository();
-    this.kpiEngine = new KPIEngine(repository);
+    this.repository = new AnalyticsRepository();
+    this.kpiEngine = new KPIEngine(this.repository);
   }
 
-  async getMetric(organizationId: string, metricName: string, filters: MetricFilterDto) {
-    return this.kpiEngine.calculateMetric(metricName.toUpperCase(), organizationId, filters);
+  async getMetric(
+    organizationId: string,
+    metricName: string,
+    filters: MetricFilterDto,
+  ) {
+    await this.repository.assertFilterScope(
+      organizationId,
+      filters,
+    );
+
+    return this.kpiEngine.calculateMetric(
+      metricName.toUpperCase(),
+      organizationId,
+      filters,
+    );
   }
 
-  async getReport(organizationId: string, reportType: string, filters: MetricFilterDto) {
-    const reportDef = this.reports[reportType.toUpperCase()];
-    if (!reportDef) {
-      throw new Error(`Report type ${reportType} not found`);
+  async getReport(
+    organizationId: string,
+    reportType: string,
+    filters: MetricFilterDto,
+  ) {
+    await this.repository.assertFilterScope(
+      organizationId,
+      filters,
+    );
+
+    const reportDefinition =
+      this.reports[reportType.toUpperCase()];
+
+    if (!reportDefinition) {
+      throw new AppError(
+        'Analytics report not found',
+        404,
+      );
     }
 
-    // Execute all metrics in parallel for performance
-    const metricPromises = reportDef.metrics.map(metric =>
-      this.kpiEngine.calculateMetric(metric, organizationId, filters).catch(err => ({
-        name: metric,
-        type: 'scalar',
-        value: null,
-        error: err.message,
-      }))
-    );
+    const metricPromises =
+      reportDefinition.metrics.map(async (metric) => {
+        try {
+          return await this.kpiEngine.calculateMetric(
+            metric,
+            organizationId,
+            filters,
+          );
+        } catch (error) {
+          return {
+            name: metric,
+            type: 'scalar',
+            value: null,
+            error:
+              error instanceof Error
+                ? error.message
+                : 'Metric calculation failed',
+          };
+        }
+      });
 
     const results = await Promise.all(metricPromises);
 
     return {
-      ...reportDef,
+      ...reportDefinition,
       results,
       generatedAt: new Date(),
       filters,

@@ -1,91 +1,39 @@
+import { Role } from '@prisma/client';
 import { Router } from 'express';
-import { AnalyticsController } from './analytics.controller';
-import { validateRequest } from '../../core/middlewares/validateRequest';
-import { GetMetricSchema, GetReportSchema } from './analytics.dto';
+
+import { requireAuth } from '../../core/middlewares/authMiddleware';
 import { requireRole } from '../../core/middlewares/rbacMiddleware';
+import { validateRequest } from '../../core/middlewares/validateRequest';
+import { asyncWrapper } from '../../core/utils/asyncWrapper';
+import { AnalyticsController } from './analytics.controller';
+import {
+  GetMetricSchema,
+  GetReportSchema,
+} from './analytics.dto';
 
 const router = Router();
 const controller = new AnalyticsController();
 
-/**
- * @swagger
- * tags:
- *   name: Analytics
- *   description: Analytics and Reporting engine
- */
-
-/**
- * @swagger
- * /analytics/metrics/{metricName}:
- *   get:
- *     summary: Get a specific KPI metric
- *     tags: [Analytics]
- *     parameters:
- *       - in: path
- *         name: metricName
- *         required: true
- *         schema:
- *           type: string
- *         description: e.g. ACTIVE_USERS, PROJECTS_CREATED
- *       - in: query
- *         name: startDate
- *         schema:
- *           type: string
- *           format: date-time
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: string
- *           format: date-time
- *       - in: query
- *         name: projectId
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Metric calculation result
- */
-router.get(
-  '/metrics/:metricName',
-  validateRequest(GetMetricSchema),
-  controller.getMetric.bind(controller)
+const requireAnalyticsAccess = requireRole(
+  Role.SUPER_ADMIN,
+  Role.ADMIN,
+  Role.MANAGER,
 );
 
-/**
- * @swagger
- * /analytics/reports/{reportType}:
- *   get:
- *     summary: Get a pre-compiled report bundle
- *     tags: [Analytics]
- *     parameters:
- *       - in: path
- *         name: reportType
- *         required: true
- *         schema:
- *           type: string
- *         description: e.g. EXECUTIVE_SUMMARY, PROJECT_HEALTH
- *       - in: query
- *         name: startDate
- *         schema:
- *           type: string
- *           format: date-time
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: string
- *           format: date-time
- *       - in: query
- *         name: projectId
- *         schema:
- *           type: string
- *     responses:
- *       200:
- *         description: Compiled report with multiple metrics
- */
+router.use(requireAuth);
+
+router.get(
+  '/metrics/:metricName',
+  requireAnalyticsAccess,
+  validateRequest(GetMetricSchema),
+  asyncWrapper(controller.getMetric.bind(controller)),
+);
+
 router.get(
   '/reports/:reportType',
+  requireAnalyticsAccess,
   validateRequest(GetReportSchema),
-  controller.getReport.bind(controller)
+  asyncWrapper(controller.getReport.bind(controller)),
 );
 
 export default router;
