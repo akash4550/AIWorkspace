@@ -1,20 +1,28 @@
+import { Role } from '@prisma/client';
+
+export type SearchModule =
+  | 'projects'
+  | 'tasks'
+  | 'crm';
+
 export interface SearchQuery {
   organizationId: string;
   userId: string;
+  role: Role;
   term: string;
-  modules?: string[]; // e.g. ['projects', 'tasks', 'crm']
-  limit?: number;
-  offset?: number;
+  modules?: SearchModule[];
+  limit: number;
+  offset: number;
 }
 
 export interface SearchResultItem {
   id: string;
-  module: string;
+  module: SearchModule;
   title: string;
   description?: string;
   url: string;
   score: number;
-  metadata?: any;
+  metadata?: unknown;
 }
 
 export interface SearchResult {
@@ -23,13 +31,7 @@ export interface SearchResult {
 }
 
 export interface SearchProvider {
-  /**
-   * Identifies the provider (e.g., 'postgres', 'elasticsearch')
-   */
   readonly name: string;
 
-  /**
-   * Executes a global search query across indexed modules.
-   */
   search(query: SearchQuery): Promise<SearchResult>;
 }
