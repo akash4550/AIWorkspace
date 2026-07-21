@@ -1,65 +1,104 @@
-import { Request, Response, NextFunction } from 'express';
-import { AIService } from './services/ai.service';
+import { Request, Response } from 'express';
+
+import { getValidatedRequest } from '../../core/middlewares/validateRequest';
+import {
+  AskAssistantRequest,
+  SummarizeTaskRequest,
+} from './ai.dto';
 import { ContextBuilder } from './context/context.builder';
 import { PROMPTS } from './prompts';
+import { AIService } from './services/ai.service';
 
 export class AIController {
-  private aiService: AIService;
+  private readonly aiService: AIService;
 
   constructor() {
     this.aiService = new AIService();
   }
 
-  async summarizeTask(req: Request, res: Response, next: NextFunction) {
-    try {
-      const taskId = String(req.params.taskId);
-      const organizationId = req.user!.organizationId;
+  async summarizeTask(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const { params } =
+      getValidatedRequest<SummarizeTaskRequest>(req);
 
-      const context = await ContextBuilder.buildTaskContext(organizationId, taskId);
+    const organizationId =
+      req.user!.organizationId;
 
-      const response = await this.aiService.generateCompletion(
+    const context =
+      await ContextBuilder.buildTaskContext(
+        organizationId,
+        params.taskId,
+      );
+
+    const response =
+      await this.aiService.generateCompletion(
         organizationId,
         req.user!.id,
         'TASK_SUMMARY',
         {
-          systemPrompt: PROMPTS.SYSTEM.DEFAULT_ASSISTANT,
-          prompt: `${PROMPTS.FEATURES.TASK_SUMMARY}\n\n${context}`
-        }
+          systemPrompt:
+            PROMPTS.SYSTEM.DEFAULT_ASSISTANT,
+          prompt:
+            `${PROMPTS.FEATURES.TASK_SUMMARY}\n\n${context}`,
+        },
       );
 
-      res.status(200).json({ data: response.text });
-    } catch (error) {
-      next(error);
-    }
+    res.status(200).json({
+      data: response.text,
+    });
   }
 
-  async askAssistant(req: Request, res: Response, next: NextFunction) {
-    try {
-      const { query, contextType, entityId } = req.body;
-      const organizationId = req.user!.organizationId;
+  async askAssistant(
+    req: Request,
+    res: Response,
+  ): Promise<void> {
+    const { body } =
+      getValidatedRequest<AskAssistantRequest>(req);
 
-      let context = '';
-      if (contextType === 'TASK' && entityId) {
-        context = await ContextBuilder.buildTaskContext(organizationId, entityId);
-      } else if (contextType === 'PROJECT' && entityId) {
-        context = await ContextBuilder.buildProjectContext(organizationId, entityId);
-      } else {
-        context = 'General Workspace Context'; // In a real app, maybe build a global summary
-      }
+    const organizationId =
+      req.user!.organizationId;
 
-      const response = await this.aiService.generateCompletion(
+    let context: string;
+
+    switch (body.contextType) {
+      case 'TASK':
+        context =
+          await ContextBuilder.buildTaskContext(
+            organizationId,
+            body.entityId,
+          );
+        break;
+
+      case 'PROJECT':
+        context =
+          await ContextBuilder.buildProjectContext(
+            organizationId,
+            body.entityId,
+          );
+        break;
+
+      case 'GLOBAL':
+        context = 'General Workspace Context';
+        break;
+    }
+
+    const response =
+      await this.aiService.generateCompletion(
         organizationId,
         req.user!.id,
         'WORKSPACE_ASSISTANT',
         {
-          systemPrompt: PROMPTS.SYSTEM.DEFAULT_ASSISTANT,
-          prompt: `User Query: ${query}\n\nRelevant Context:\n${context}`
-        }
+          systemPrompt:
+            PROMPTS.SYSTEM.DEFAULT_ASSISTANT,
+          prompt:
+            `User Query: ${body.query}\n\nRelevant Context:\n${context}`,
+        },
       );
 
-      res.status(200).json({ data: response.text });
-    } catch (error) {
-      next(error);
-    }
+    res.status(200).json({
+      data: response.text,
+    });
   }
 }
