@@ -1,25 +1,72 @@
-import { PrismaClient } from '@prisma/client';
-
-const prisma = new PrismaClient();
+import { prisma } from '../../../config/prisma';
+import { AppError } from '../../../core/errors/AppError';
 
 export class ContextBuilder {
-  /**
-   * Safely fetches task details, ensuring it belongs to the organization.
-   * Formats it into a dense string suitable for LLM injection.
-   */
-  static async buildTaskContext(organizationId: string, taskId: string): Promise<string> {
+  static async buildTaskContext(
+    organizationId: string,
+    taskId: string,
+  ): Promise<string> {
+    if (!organizationId) {
+      throw new AppError(
+        'Organization context is required',
+        400,
+      );
+    }
+
     const task = await prisma.task.findFirst({
-      where: { id: taskId, organizationId },
-      include: {
-        assignee: true,
-        project: true,
-        subtasks: true
-      }
+      where: {
+        id: taskId,
+        organizationId,
+        deletedAt: null,
+        project: {
+          organizationId,
+          deletedAt: null,
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+        status: true,
+        priority: true,
+        description: true,
+        assignee: {
+          select: {
+            firstName: true,
+            lastName: true,
+            deletedAt: true,
+            isActive: true,
+          },
+        },
+        project: {
+          select: {
+            name: true,
+          },
+        },
+        subtasks: {
+          where: {
+            organizationId,
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+          },
+        },
+      },
     });
 
     if (!task) {
-      throw new Error('Task not found or access denied');
+      throw new AppError(
+        'Task not found',
+        404,
+      );
     }
+
+    const activeAssignee =
+      task.assignee &&
+      task.assignee.isActive &&
+      !task.assignee.deletedAt
+        ? `${task.assignee.firstName} ${task.assignee.lastName}`
+        : 'Unassigned';
 
     return `
 [TASK CONTEXT]
@@ -27,41 +74,77 @@ ID: ${task.id}
 Title: ${task.title}
 Status: ${task.status}
 Priority: ${task.priority}
-Assignee: ${task.assignee ? `${task.assignee.firstName} ${task.assignee.lastName}` : 'Unassigned'}
+Assignee: ${activeAssignee}
 Project: ${task.project.name}
-Description: ${task.description || 'None'}
+Description: ${task.description ?? 'None'}
 Subtasks Count: ${task.subtasks.length}
-`;
+`.trim();
   }
 
-  /**
-   * Safely fetches project details and associated tasks.
-   */
-  static async buildProjectContext(organizationId: string, projectId: string): Promise<string> {
-    const project = await prisma.project.findFirst({
-      where: { id: projectId, organizationId },
-      include: {
-        tasks: {
-          select: { title: true, status: true, priority: true }
-        }
-      }
-    });
-
-    if (!project) {
-      throw new Error('Project not found or access denied');
+  static async buildProjectContext(
+    organizationId: string,
+    projectId: string,
+  ): Promise<string> {
+    if (!organizationId) {
+      throw new AppError(
+        'Organization context is required',
+        400,
+      );
     }
 
-    const taskSummary = project.tasks.map(t => `- [${t.status}] ${t.title} (${t.priority})`).join('\n');
+    const project =
+      await prisma.project.findFirst({
+        where: {
+          id: projectId,
+          organizationId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          name: true,
+          status: true,
+          description: true,
+          tasks: {
+            where: {
+              organizationId,
+              deletedAt: null,
+            },
+            select: {
+              title: true,
+              status: true,
+              priority: true,
+            },
+            orderBy: {
+              createdAt: 'asc',
+            },
+            take: 100,
+          },
+        },
+      });
+
+    if (!project) {
+      throw new AppError(
+        'Project not found',
+        404,
+      );
+    }
+
+    const taskSummary = project.tasks
+      .map(
+        (task) =>
+          `- [${task.status}] ${task.title} (${task.priority})`,
+      )
+      .join('\n');
 
     return `
 [PROJECT CONTEXT]
 ID: ${project.id}
 Name: ${project.name}
 Status: ${project.status}
-Description: ${project.description || 'None'}
+Description: ${project.description ?? 'None'}
 
 Tasks:
 ${taskSummary || 'No tasks assigned.'}
-`;
+`.trim();
   }
 }

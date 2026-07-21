@@ -345,6 +345,7 @@ enum AIProvider {
   OPENAI
   GEMINI
   ANTHROPIC
+  MOCK
 }
 
 
