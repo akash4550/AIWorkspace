@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, Title, Text, Table, TableHead, TableHeaderCell, TableBody, TableRow, TableCell, Badge, Button, Flex } from '@tremor/react';
 import { PlusIcon } from '@heroicons/react/24/outline';
 
@@ -7,7 +7,7 @@ const mockOpportunities = [
   { id: '2', title: 'Consulting Services', stage: 'Proposal', probability: 40, expectedRevenue: 120000, closeDate: '2026-10-15' },
 ];
 
-export const OpportunitiesPage: React.FC = () => {
+export const OpportunitiesPage = () => {
   const [opportunities] = useState(mockOpportunities);
 
   return (

@@ -1,20 +1,29 @@
-import React from 'react';
-import { Navigate, Outlet } from 'react-router-dom';
+import { Navigate, Outlet, useLocation } from 'react-router-dom';
+
+import type { Role } from '../config/navigation';
+import { useAuth } from '../providers/AuthProvider';
 
 interface ProtectedRouteProps {
-  allowedRoles?: string[];
+  allowedRoles?: Role[];
 }
 
 export const ProtectedRoute = ({ allowedRoles }: ProtectedRouteProps) => {
-  // In Phase 4, we'd check actual auth state here.
-  const isAuthenticated = true; 
-  const userRole = 'ADMIN';
+  const { status, user } = useAuth();
+  const location = useLocation();
 
-  if (!isAuthenticated) {
-    return <Navigate to="/login" replace />;
+  if (status === 'initializing') {
+    return (
+      <div className="flex min-h-screen items-center justify-center bg-gray-50 text-gray-700 dark:bg-slate-900 dark:text-gray-200" role="status">
+        Restoring your session…
+      </div>
+    );
   }
 
-  if (allowedRoles && !allowedRoles.includes(userRole)) {
+  if (status !== 'authenticated' || !user) {
+    return <Navigate to="/login" state={{ from: location }} replace />;
+  }
+
+  if (allowedRoles && !allowedRoles.includes(user.role)) {
     return <Navigate to="/403" replace />;
   }
 

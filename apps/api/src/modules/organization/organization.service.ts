@@ -24,6 +24,12 @@ export class OrganizationService {
                 throw new AppError('Slug is already taken by another organization', 400);
             }
         }
-        return this.repository.update(organizationId, data);
+
+        const organization = await this.repository.update(organizationId, data);
+        if (!organization) {
+            throw new AppError('Organization not found', 404);
+        }
+
+        return organization;
     }
 }

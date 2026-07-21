@@ -1,5 +1,6 @@
 import { MetricFilterDto } from './analytics.dto';
 
+export type { MetricFilterDto };
 export type TimeSeriesDataPoint = {
   date: string;
   value: number;

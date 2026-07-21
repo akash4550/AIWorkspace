@@ -1,4 +1,4 @@
-import React from 'react';
+import { type FC, type ReactNode } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Title, Text, Button } from '@tremor/react';
 import { LayoutDashboard, BrainCircuit, ShieldCheck, Zap } from 'lucide-react';
@@ -78,11 +78,11 @@ export const LandingPage = () => {
   );
 };
 
-const Badge: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className }) => (
+const Badge: FC<{ children: ReactNode; className?: string }> = ({ children, className }) => (
   <div className={className}>{children}</div>
 );
 
-const FeatureCard: React.FC<{ icon: React.ReactNode; title: string; description: string }> = ({ icon, title, description }) => (
+const FeatureCard: FC<{ icon: ReactNode; title: string; description: string }> = ({ icon, title, description }) => (
   <div className="p-6 bg-white dark:bg-slate-800 rounded-2xl border border-gray-100 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
     <div className="w-12 h-12 bg-gray-50 dark:bg-slate-900 rounded-xl flex items-center justify-center mb-4 border border-gray-100 dark:border-slate-700">
       {icon}

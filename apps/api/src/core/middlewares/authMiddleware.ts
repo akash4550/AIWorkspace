@@ -1,50 +1,44 @@
 import { Request, Response, NextFunction } from 'express';
+
+import { AuthService } from '../../modules/auth/auth.service';
 import { AppError } from '../errors/AppError';
-import { PrismaClient, Role } from '@prisma/client';
 
-const prisma = new PrismaClient();
+const authService = new AuthService();
 
-export const requireAuth = async (req: Request, res: Response, next: NextFunction) => {
-    // In a real implementation (Phase 4), we would extract and verify the JWT here.
-    // Since Phase 4 was skipped by the user and we went straight to Phase 5,
-    // we will mock the auth middleware by fetching the demo admin from the DB.
-    
-    try {
-        const authHeader = req.headers.authorization;
-        
-        // For development/testing of Phase 5, if no token, assume the demo admin
-        // In production, this would strictly throw 401 Unauthorized if missing.
-        let email = 'admin@aiworkspace.com'; 
+export const requireAuth = async (
+  req: Request,
+  _res: Response,
+  next: NextFunction
+) => {
+  try {
+    const authHeader = req.headers.authorization;
 
-        // Simple mock for testing different users: "Bearer user_id_here"
-        if (authHeader && authHeader.startsWith('Bearer ')) {
-            const token = authHeader.split(' ')[1];
-            // If the token looks like a UUID, we mock it as a user ID login for testing RBAC
-            if (token.length > 20) {
-               const user = await prisma.user.findUnique({ where: { id: token } });
-               if (user) {
-                   req.user = { id: user.id, organizationId: user.organizationId, role: user.role };
-                   return next();
-               }
-            }
-        }
-
-        const adminUser = await prisma.user.findUnique({
-            where: { email }
-        });
-
-        if (!adminUser) {
-            return next(new AppError('Unauthorized - Demo user not found (Did you run seed?)', 401));
-        }
-
-        req.user = {
-            id: adminUser.id,
-            organizationId: adminUser.organizationId,
-            role: adminUser.role
-        };
-
-        next();
-    } catch (error) {
-        next(new AppError('Invalid token', 401));
+    if (!authHeader) {
+      return next(
+        new AppError('Authorization header is missing', 401)
+      );
     }
+
+    if (!authHeader.startsWith('Bearer ')) {
+      return next(
+        new AppError('Invalid authorization header format', 401)
+      );
+    }
+
+    const token = authHeader.substring(7).trim();
+
+    if (!token) {
+      return next(
+        new AppError('Authentication token is required', 401)
+      );
+    }
+
+    const user = await authService.authenticate(token);
+
+    req.user = user;
+
+    next();
+  } catch (error) {
+    next(error);
+  }
 };

@@ -1,7 +1,8 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import { createContext, useContext, useEffect, useState, type ReactNode } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { useRealtimeStore } from '../stores/useRealtimeStore';
 import { useQueryClient } from '@tanstack/react-query';
+import { useAuth } from './AuthProvider';
 
 interface SocketContextType {
   socket: Socket | null;
@@ -11,35 +12,39 @@ const SocketContext = createContext<SocketContextType>({ socket: null });
 
 export const useSocket = () => useContext(SocketContext);
 
-export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const SocketProvider = ({ children }: { children: ReactNode }) => {
   const [socket, setSocket] = useState<Socket | null>(null);
   const { setConnected, addNotification, updatePresence } = useRealtimeStore();
   const queryClient = useQueryClient();
+  const { status, accessToken } = useAuth();
 
   useEffect(() => {
-    // In a real app, this token would come from auth store/context
-    const token = localStorage.getItem('aiworkspace_token');
-    
-    // For demo purposes, we only connect if we simulate having a token
-    // Our mock login doesn't set a real JWT yet, so we'll mock the socket url or skip connection
-    // Let's connect to the local server
-    const socketInstance = io(import.meta.env.VITE_API_URL || 'http://localhost:4000', {
-      auth: { token: token || 'mock_token' },
+    if (status !== 'authenticated' || !accessToken) {
+      setSocket(null);
+      setConnected(false);
+      return;
+    }
+
+    const socketUrl = import.meta.env.VITE_SOCKET_URL?.trim() || undefined;
+    const socketInstance = io(socketUrl, {
+      path: import.meta.env.VITE_SOCKET_PATH || '/socket.io',
+      auth: { token: accessToken },
       autoConnect: true,
-      // For demo, since we don't have a real JWT yet in this mock phase, it will fail auth
-      // So in a real implementation we wait for auth to succeed before connecting.
+      reconnection: false,
     });
 
     setSocket(socketInstance);
 
     socketInstance.on('connect', () => {
       setConnected(true);
-      console.log('Connected to realtime server');
     });
 
     socketInstance.on('disconnect', () => {
       setConnected(false);
-      console.log('Disconnected from realtime server');
+    });
+
+    socketInstance.on('connect_error', () => {
+      setConnected(false);
     });
 
     // --- Domain Events ---
@@ -70,8 +75,9 @@ export const SocketProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     return () => {
       socketInstance.disconnect();
+      setConnected(false);
     };
-  }, [setConnected, addNotification, updatePresence, queryClient]);
+  }, [accessToken, status, setConnected, addNotification, updatePresence, queryClient]);
 
   return (
     <SocketContext.Provider value={{ socket }}>

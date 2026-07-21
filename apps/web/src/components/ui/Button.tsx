@@ -1,23 +1,26 @@
-import React from 'react';
+import { forwardRef, type ButtonHTMLAttributes } from 'react';
 
-interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
-  variant?: 'primary' | 'secondary' | 'danger' | 'ghost';
+interface ButtonProps extends ButtonHTMLAttributes<HTMLButtonElement> {
+  variant?: 'primary' | 'secondary' | 'danger' | 'ghost' | 'outline';
   size?: 'sm' | 'md' | 'lg';
   isLoading?: boolean;
 }
 
-export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
+export const Button = forwardRef<HTMLButtonElement, ButtonProps>(
   ({ className = '', variant = 'primary', size = 'md', isLoading, children, disabled, ...props }, ref) => {
     const baseStyles = 'inline-flex items-center justify-center font-medium rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-offset-2 disabled:opacity-50 disabled:pointer-events-none';
+    const variantValue = variant ?? 'primary';
+    const sizeValue = size ?? 'md';
     
-    const variants = {
+    const variants: Record<NonNullable<ButtonProps['variant']>, string> = {
       primary: 'bg-primary-600 text-white hover:bg-primary-700 focus:ring-primary-500',
       secondary: 'bg-white text-gray-700 border border-gray-300 hover:bg-gray-50 focus:ring-primary-500',
       danger: 'bg-red-600 text-white hover:bg-red-700 focus:ring-red-500',
       ghost: 'bg-transparent text-gray-700 hover:bg-gray-100 focus:ring-gray-500 dark:text-gray-300 dark:hover:bg-sidebar-dark',
+      outline: 'border border-gray-300 bg-transparent text-gray-700 hover:bg-gray-50 dark:border-slate-600 dark:text-gray-200 dark:hover:bg-slate-700',
     };
 
-    const sizes = {
+    const sizes: Record<NonNullable<ButtonProps['size']>, string> = {
       sm: 'h-8 px-3 text-sm',
       md: 'h-10 px-4 py-2 text-sm',
       lg: 'h-12 px-6 text-base',
@@ -26,7 +29,7 @@ export const Button = React.forwardRef<HTMLButtonElement, ButtonProps>(
     return (
       <button
         ref={ref}
-        className={`${baseStyles} ${variants[variant]} ${sizes[size]} ${className}`}
+        className={`${baseStyles} ${variants[variantValue]} ${sizes[sizeValue]} ${className}`}
         disabled={disabled || isLoading}
         {...props}
       >

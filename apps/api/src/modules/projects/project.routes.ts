@@ -1,49 +1,127 @@
 import { Router } from 'express';
+
 import { ProjectController } from './project.controller';
+
 import { requireAuth } from '../../core/middlewares/authMiddleware';
-import { requireRole } from '../../core/middlewares/rbacMiddleware';
+
+import { requirePermission } from '../../core/middlewares/rbacMiddleware';
+
 import { validateRequest } from '../../core/middlewares/validateRequest';
-import { createProjectSchema, updateProjectSchema } from './project.validator';
-import { asyncWrapper } from '../../core/utils/asyncWrapper';
+
+import {
+  createProjectSchema,
+  updateProjectSchema,
+  getProjectSchema,
+  deleteProjectSchema,
+} from './project.validator';
+
+import {
+  PROJECT_PERMISSIONS,
+} from './project.permissions';
+
+
 
 const router = Router();
-const controller = new ProjectController();
+
+const controller =
+  new ProjectController();
+
+
 
 router.use(requireAuth);
 
-router.get('/', asyncWrapper(controller.getProjects));
-router.get('/:id', asyncWrapper(controller.getProjectById));
+
+
+
+
+router.get(
+  '/',
+  requirePermission(
+    PROJECT_PERMISSIONS.READ
+  ),
+  controller.getProjects
+);
+
+
+
+
+
+router.get(
+  '/:id',
+  requirePermission(
+    PROJECT_PERMISSIONS.READ
+  ),
+  validateRequest(getProjectSchema),
+  controller.getProjectById
+);
+
+
+
+
 
 router.post(
-    '/',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER'),
-    validateRequest(createProjectSchema),
-    asyncWrapper(controller.createProject)
+  '/',
+  requirePermission(
+    PROJECT_PERMISSIONS.CREATE
+  ),
+  validateRequest(createProjectSchema),
+  controller.createProject
 );
 
-router.patch(
-    '/:id',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER'),
-    validateRequest(updateProjectSchema),
-    asyncWrapper(controller.updateProject)
-);
+
+
+
 
 router.patch(
-    '/:id/archive',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER'),
-    asyncWrapper(controller.archiveProject)
+  '/:id',
+  requirePermission(
+    PROJECT_PERMISSIONS.UPDATE
+  ),
+  validateRequest(updateProjectSchema),
+  controller.updateProject
 );
 
+
+
+
+
 router.patch(
-    '/:id/restore',
-    requireRole('SUPER_ADMIN', 'ADMIN', 'MANAGER'),
-    asyncWrapper(controller.restoreProject)
+  '/:id/archive',
+  requirePermission(
+    PROJECT_PERMISSIONS.UPDATE
+  ),
+  validateRequest(getProjectSchema),
+  controller.archiveProject
 );
+
+
+
+
+
+router.patch(
+  '/:id/restore',
+  requirePermission(
+    PROJECT_PERMISSIONS.UPDATE
+  ),
+  validateRequest(getProjectSchema),
+  controller.restoreProject
+);
+
+
+
+
 
 router.delete(
-    '/:id',
-    requireRole('SUPER_ADMIN', 'ADMIN'), // Employees and Managers cannot delete
-    asyncWrapper(controller.deleteProject)
+  '/:id',
+  requirePermission(
+    PROJECT_PERMISSIONS.DELETE
+  ),
+  validateRequest(deleteProjectSchema),
+  controller.deleteProject
 );
+
+
+
+
 
 export default router;

@@ -1,0 +1,14 @@
+import { PERMISSIONS } from '../../core/auth/permissions';
+
+
+export const USER_PERMISSIONS = {
+
+  READ: PERMISSIONS.USER.READ,
+
+  CREATE: PERMISSIONS.USER.CREATE,
+
+  UPDATE: PERMISSIONS.USER.UPDATE,
+
+  DELETE: PERMISSIONS.USER.DELETE,
+
+};

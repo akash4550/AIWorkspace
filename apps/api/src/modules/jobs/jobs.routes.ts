@@ -1,12 +1,13 @@
 import { Router } from 'express';
 import { JobsController } from './jobs.controller';
 import { requireRole } from '../../core/middlewares/rbacMiddleware';
+import { Role } from '@prisma/client';
 
 const router = Router();
 const controller = new JobsController();
 
 // All job queue endpoints are strictly administrative
-router.use(requireRole(['SUPER_ADMIN']));
+router.use(requireRole(Role.SUPER_ADMIN));
 
 /**
  * @swagger

@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useSearchParams, useNavigate } from 'react-router-dom';
 import { Title, Card, Text, Badge, TextInput, Select, SelectItem } from '@tremor/react';
 import { Search, FolderKanban, CheckSquare, UsersRound } from 'lucide-react';
 import { useGlobalSearch } from './hooks/useSearch';
 import { useDebounce } from 'use-debounce';
 
-export const SearchResultsPage: React.FC = () => {
+export const SearchResultsPage = () => {
   const [searchParams, setSearchParams] = useSearchParams();
   const initialQuery = searchParams.get('q') || '';
   
@@ -19,7 +19,7 @@ export const SearchResultsPage: React.FC = () => {
   const { data: results, isLoading } = useGlobalSearch(debouncedTerm, activeModules, 50);
 
   // Update URL on debounce
-  React.useEffect(() => {
+  useEffect(() => {
     if (debouncedTerm) {
       setSearchParams({ q: debouncedTerm });
     }

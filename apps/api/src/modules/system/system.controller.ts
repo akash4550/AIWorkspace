@@ -1,6 +1,6 @@
 import { Request, Response } from 'express';
 import { PrismaClient } from '@prisma/client';
-import { getRedisClient } from '../jobs/services/redis.service';
+import { getRedisClient } from '../../core/redis/redis.client';
 import { logger } from '../../core/utils/logger';
 
 const prisma = new PrismaClient();

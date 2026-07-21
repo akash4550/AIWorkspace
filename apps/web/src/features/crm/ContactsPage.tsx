@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, Title, Text, Table, TableHead, TableHeaderCell, TableBody, TableRow, TableCell, Button, Flex } from '@tremor/react';
 import { PlusIcon } from '@heroicons/react/24/outline';
 
@@ -7,7 +7,7 @@ const mockContacts = [
   { id: '2', firstName: 'Jane', lastName: 'Smith', email: 'jane@stark.com', phone: '+1 555-0101', designation: 'CTO' },
 ];
 
-export const ContactsPage: React.FC = () => {
+export const ContactsPage = () => {
   const [contacts] = useState(mockContacts);
 
   return (

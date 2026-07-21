@@ -1,4 +1,3 @@
-import React from 'react';
 import { Card, Title, DonutChart, Text } from '@tremor/react';
 
 interface DistributionChartProps {
@@ -11,7 +10,7 @@ interface DistributionChartProps {
   isLoading?: boolean;
 }
 
-export const DistributionChart: React.FC<DistributionChartProps> = ({
+export const DistributionChart = ({
   title,
   data,
   category,
@@ -19,7 +18,7 @@ export const DistributionChart: React.FC<DistributionChartProps> = ({
   colors = ['slate', 'violet', 'indigo', 'rose', 'cyan', 'amber'],
   valueFormatter,
   isLoading
-}) => {
+}: DistributionChartProps) => {
   return (
     <Card>
       <Title>{title}</Title>

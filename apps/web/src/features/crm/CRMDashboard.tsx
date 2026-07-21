@@ -1,10 +1,10 @@
-import React, { useMemo } from 'react';
+import { useMemo } from 'react';
 import { Card, Title, Text, Metric, Grid, Flex, Icon, Button } from '@tremor/react';
 import { Link } from 'react-router-dom';
 import { UsersIcon, BriefcaseIcon, CurrencyDollarIcon, PresentationChartLineIcon } from '@heroicons/react/24/outline';
 import { useClients, useOpportunities, useActivities } from './hooks/useCRMQueries';
 
-export const CRMDashboard: React.FC = () => {
+export const CRMDashboard = () => {
   const { data: clients, isLoading: isLoadingClients } = useClients();
   const { data: opportunities, isLoading: isLoadingOpps } = useOpportunities();
   const { data: activities, isLoading: isLoadingActivities } = useActivities();

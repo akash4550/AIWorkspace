@@ -1,79 +1,116 @@
+import { Server as HttpServer } from 'node:http';
+import { Role } from '@prisma/client';
 import { Server, Socket } from 'socket.io';
-import { Server as HttpServer } from 'http';
-import jwt from 'jsonwebtoken';
-import { config } from '../../config/env';
-import { PrismaClient } from '@prisma/client';
 
-const prisma = new PrismaClient();
+import { env } from '../../config/env';
+import { logger } from '../../core/utils/logger';
+import { verifyAccessToken } from '../../core/security/jwt';
+import { authService } from '../auth/auth.service';
 
-export interface AuthSocket extends Socket {
-  user?: {
-    id: string;
-    organizationId: string;
-    role: string;
-  };
+const AUTHENTICATION_ERROR = 'Authentication error';
+const USER_ROOM_PREFIX = 'user:';
+const ORGANIZATION_ROOM_PREFIX = 'organization:';
+
+export interface SocketPrincipal {
+  userId: string;
+  organizationId: string;
+  role: Role;
+  accessTokenExpiresAt: number;
+  tokenId: string;
 }
 
-let io: Server;
+interface AuthenticatedSocketData {
+  principal?: SocketPrincipal;
+}
 
-export const initializeSocket = (httpServer: HttpServer) => {
-  io = new Server(httpServer, {
+export type AuthSocket = Socket<
+  Record<string, never>,
+  Record<string, never>,
+  Record<string, never>,
+  AuthenticatedSocketData
+>;
+
+export const userRoom = (userId: string): string => `${USER_ROOM_PREFIX}${userId}`;
+export const organizationRoom = (organizationId: string): string =>
+  `${ORGANIZATION_ROOM_PREFIX}${organizationId}`;
+
+let io: Server | undefined;
+
+export const initializeSocket = (httpServer: HttpServer): Server => {
+  const socketServer = new Server(httpServer, {
     cors: {
-      origin: '*', // Adjust for production
-      methods: ['GET', 'POST']
-    }
+      origin: env.FRONTEND_URL,
+      methods: ['GET', 'POST'],
+      credentials: true,
+    },
   });
+  io = socketServer;
 
-  // Authentication Middleware
-  io.use(async (socket: AuthSocket, next) => {
+  socketServer.use(async (socket: AuthSocket, next) => {
     try {
-      const token = socket.handshake.auth?.token || socket.handshake.headers?.authorization?.split(' ')[1];
-      if (!token) return next(new Error('Authentication error'));
+      const token = socket.handshake.auth?.token;
+      if (typeof token !== 'string' || token.length === 0) {
+        logger.warn('Socket authentication rejected', { category: 'missing_access_token' });
+        next(new Error(AUTHENTICATION_ERROR));
+        return;
+      }
 
-      const decoded = jwt.verify(token, config.jwtSecret) as any;
-      socket.user = {
-        id: decoded.id,
-        organizationId: decoded.organizationId,
-        role: decoded.role
+      const claims = verifyAccessToken(token);
+      const identity = await authService.loadAuthoritativeIdentity(
+        claims.sub,
+        claims.organizationId,
+      );
+
+      socket.data.principal = {
+        userId: identity.id,
+        organizationId: identity.organizationId,
+        role: identity.role,
+        accessTokenExpiresAt: claims.exp,
+        tokenId: claims.jti,
       };
       next();
-    } catch (err) {
-      next(new Error('Authentication error'));
+    } catch {
+      logger.warn('Socket authentication rejected', { category: 'invalid_access_token' });
+      next(new Error(AUTHENTICATION_ERROR));
     }
   });
 
-  io.on('connection', (socket: AuthSocket) => {
-    console.log(`Socket connected: ${socket.id} (User: ${socket.user?.id})`);
+  socketServer.on('connection', (socket: AuthSocket) => {
+    const principal = socket.data.principal;
+    if (!principal) {
+      socket.disconnect(true);
+      return;
+    }
 
-    // 1. Enforce Tenant Isolation: Join the Organization Room
-    const orgRoom = `org_${socket.user?.organizationId}`;
-    socket.join(orgRoom);
-    
-    // 2. Personal Room for direct notifications
-    const userRoom = `user_${socket.user?.id}`;
-    socket.join(userRoom);
+    const orgRoom = organizationRoom(principal.organizationId);
+    const personalRoom = userRoom(principal.userId);
+    void socket.join([orgRoom, personalRoom]);
 
-    // 3. Presence: Broadcast user online
+    logger.info('Socket connected', { socketId: socket.id, userId: principal.userId });
+
     socket.to(orgRoom).emit('presence.status', {
-      userId: socket.user?.id,
+      userId: principal.userId,
       status: 'online',
-      timestamp: new Date()
+      timestamp: new Date(),
     });
 
-    socket.on('disconnect', () => {
-      // Broadcast user offline
+    const expiresInMs = Math.max(0, principal.accessTokenExpiresAt * 1000 - Date.now());
+    const expirationTimer = setTimeout(() => socket.disconnect(true), expiresInMs);
+
+    socket.once('disconnect', () => {
+      clearTimeout(expirationTimer);
       socket.to(orgRoom).emit('presence.status', {
-        userId: socket.user?.id,
+        userId: principal.userId,
         status: 'offline',
-        timestamp: new Date()
+        timestamp: new Date(),
       });
     });
   });
 
-  return io;
+  return socketServer;
 };
 
-export const getIO = () => {
+export const getIO = (): Server => {
   if (!io) {
     throw new Error('Socket.io has not been initialized!');
   }

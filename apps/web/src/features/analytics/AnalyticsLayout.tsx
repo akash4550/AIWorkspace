@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
-import { TabGroup, TabList, Tab, TabPanels, TabPanel } from '@tremor/react';
+import { useState } from 'react';
+import { TabGroup, TabList, Tab } from '@tremor/react';
 import { ExecutiveDashboard } from './ExecutiveDashboard';
 import { ProjectDashboard } from './ProjectDashboard';
 import { AnalyticsCRMOverview } from './AnalyticsCRMOverview';
 import { TeamDashboard } from './TeamDashboard';
 
-export const AnalyticsLayout: React.FC = () => {
+export const AnalyticsLayout = () => {
   const [selectedIndex, setSelectedIndex] = useState(0);
 
   return (

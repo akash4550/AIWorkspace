@@ -1,12 +1,21 @@
 import { Router } from 'express';
-import { AIController } from './ai.controller';
+
+import { PERMISSIONS } from '../../core/auth/permissions';
 import { requireAuth } from '../../core/middlewares/authMiddleware';
+import { requirePermission } from '../../core/middlewares/rbacMiddleware';
+import { validateRequest } from '../../core/middlewares/validateRequest';
+import { asyncWrapper } from '../../core/utils/asyncWrapper';
+import { AIController } from './ai.controller';
+import {
+  AskAssistantSchema,
+  SummarizeTaskSchema,
+} from './ai.dto';
 
 const router = Router();
 const controller = new AIController();
 
-// Use authentication and organization isolation middleware
 router.use(requireAuth);
+router.use(requirePermission(PERMISSIONS.AI.USE));
 
 /**
  * @swagger
@@ -27,11 +36,26 @@ router.use(requireAuth);
  *         required: true
  *         schema:
  *           type: string
+ *           format: uuid
  *     responses:
  *       200:
  *         description: Task summary text
+ *       400:
+ *         description: Invalid task identifier
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: AI permission required
+ *       404:
+ *         description: Task not found
  */
-router.get('/tasks/:taskId/summary', controller.summarizeTask.bind(controller));
+router.get(
+  '/tasks/:taskId/summary',
+  validateRequest(SummarizeTaskSchema),
+  asyncWrapper(
+    controller.summarizeTask.bind(controller),
+  ),
+);
 
 /**
  * @swagger
@@ -44,19 +68,55 @@ router.get('/tasks/:taskId/summary', controller.summarizeTask.bind(controller));
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             properties:
- *               query:
- *                 type: string
- *               contextType:
- *                 type: string
- *                 enum: [GLOBAL, TASK, PROJECT, CRM]
- *               entityId:
- *                 type: string
+ *             oneOf:
+ *               - type: object
+ *                 additionalProperties: false
+ *                 required:
+ *                   - query
+ *                   - contextType
+ *                 properties:
+ *                   query:
+ *                     type: string
+ *                     minLength: 1
+ *                     maxLength: 2000
+ *                   contextType:
+ *                     type: string
+ *                     enum: [GLOBAL]
+ *               - type: object
+ *                 additionalProperties: false
+ *                 required:
+ *                   - query
+ *                   - contextType
+ *                   - entityId
+ *                 properties:
+ *                   query:
+ *                     type: string
+ *                     minLength: 1
+ *                     maxLength: 2000
+ *                   contextType:
+ *                     type: string
+ *                     enum: [TASK, PROJECT]
+ *                   entityId:
+ *                     type: string
+ *                     format: uuid
  *     responses:
  *       200:
  *         description: Assistant response
+ *       400:
+ *         description: Invalid assistant request
+ *       401:
+ *         description: Authentication required
+ *       403:
+ *         description: AI permission required
+ *       404:
+ *         description: Context entity not found
  */
-router.post('/assistant/ask', controller.askAssistant.bind(controller));
+router.post(
+  '/assistant/ask',
+  validateRequest(AskAssistantSchema),
+  asyncWrapper(
+    controller.askAssistant.bind(controller),
+  ),
+);
 
 export default router;

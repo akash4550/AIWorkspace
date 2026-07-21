@@ -12,7 +12,7 @@ export class SearchController {
     try {
       const { q, modules, limit, offset } = req.query;
       const organizationId = req.user!.organizationId;
-      const userId = req.user!.userId;
+      const userId = req.user!.id;
 
       const parsedModules = modules ? (modules as string).split(',') : undefined;
       const parsedLimit = limit ? parseInt(limit as string, 10) : 20;

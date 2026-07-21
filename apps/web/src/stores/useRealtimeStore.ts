@@ -25,13 +25,18 @@ interface RealtimeState {
   addNotification: (notification: Notification) => void;
   markAsRead: (id: string) => void;
   updatePresence: (presence: Presence) => void;
+  reset: () => void;
 }
 
-export const useRealtimeStore = create<RealtimeState>((set) => ({
+const initialRealtimeState = {
   isConnected: false,
   notifications: [],
   unreadCount: 0,
   onlineUsers: {},
+};
+
+export const useRealtimeStore = create<RealtimeState>((set) => ({
+  ...initialRealtimeState,
 
   setConnected: (status) => set({ isConnected: status }),
   
@@ -50,5 +55,7 @@ export const useRealtimeStore = create<RealtimeState>((set) => ({
       ...state.onlineUsers,
       [presence.userId]: presence
     }
-  }))
+  })),
+
+  reset: () => set(initialRealtimeState),
 }));

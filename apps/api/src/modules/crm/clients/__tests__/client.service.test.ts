@@ -28,6 +28,7 @@ describe('ClientService', () => {
     repositoryMock.findById = jest.fn();
     repositoryMock.findMany = jest.fn();
     repositoryMock.update = jest.fn();
+    repositoryMock.softDelete = jest.fn();
   });
 
   describe('createClient', () => {
@@ -86,13 +87,12 @@ describe('ClientService', () => {
 
   describe('updateClient', () => {
     it('should throw an error if client does not exist', async () => {
-      repositoryMock.findById.mockResolvedValue(null);
+      repositoryMock.update.mockRejectedValue(new Error('Client not found'));
 
       await expect(service.updateClient('org-1', 'invalid-id', { name: 'New Name' })).rejects.toThrow('Client not found');
     });
 
     it('should update the client and emit an event', async () => {
-      repositoryMock.findById.mockResolvedValue({ id: 'client-1' } as any);
       repositoryMock.update.mockResolvedValue({ id: 'client-1', name: 'New Name' } as any);
 
       const result = await service.updateClient('org-1', 'client-1', { name: 'New Name' });
@@ -108,21 +108,20 @@ describe('ClientService', () => {
 
   describe('deleteClient', () => {
     it('should throw an error if client does not exist', async () => {
-      repositoryMock.findById.mockResolvedValue(null);
+      repositoryMock.softDelete.mockRejectedValue(new Error('Client not found'));
 
       await expect(service.deleteClient('org-1', 'invalid-id')).rejects.toThrow('Client not found');
     });
 
     it('should soft delete the client and emit an event', async () => {
-      repositoryMock.findById.mockResolvedValue({ id: 'client-1' } as any);
-      repositoryMock.update.mockResolvedValue({ id: 'client-1' } as any);
+      repositoryMock.softDelete.mockResolvedValue(undefined);
 
       const result = await service.deleteClient('org-1', 'client-1');
 
-      expect(repositoryMock.update).toHaveBeenCalledWith(
+      expect(repositoryMock.softDelete).toHaveBeenCalledWith(
         'client-1',
         'org-1',
-        expect.objectContaining({ deletedAt: expect.any(Date) })
+        expect.any(Date),
       );
       expect(eventBus.emitEvent).toHaveBeenCalledWith('ClientDeleted', {
         organizationId: 'org-1',

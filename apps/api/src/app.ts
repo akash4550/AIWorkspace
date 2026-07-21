@@ -1,12 +1,44 @@
 import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
+import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import morgan from 'morgan';
 import rateLimit from 'express-rate-limit';
 import { errorMiddleware } from './core/middlewares/errorMiddleware';
 import { logger } from './core/utils/logger';
 
+import organizationRoutes from './modules/organization/organization.routes';
+import userRoutes from './modules/user/user.routes';
+import taskRoutes from './modules/tasks/task.routes';
+import teamRoutes from './modules/teams/team.routes';
+import documentRoutes from './modules/documents/document.routes';
+import clientRoutes from './modules/crm/clients/client.routes';
+import contactRoutes from './modules/crm/contacts/contact.routes';
+import leadRoutes from './modules/crm/leads/lead.routes';
+import opportunityRoutes from './modules/crm/opportunities/opportunity.routes';
+import pipelineRoutes from './modules/crm/pipeline/pipeline.routes';
+import activityRoutes from './modules/crm/activities/activity.routes';
+import analyticsRoutes from './modules/analytics/analytics.routes';
+import jobsRoutes from './modules/jobs/jobs.routes';
+import swaggerUi from 'swagger-ui-express';
+import swaggerJsdoc from 'swagger-jsdoc';
+import { startWorkers } from './modules/jobs/workers';
+import { startScheduler } from './modules/jobs/scheduler';
+import projectRoutes from './modules/projects/project.routes';
+import systemRoutes from './modules/system/system.routes';
+
+import aiRoutes from './modules/ai/ai.routes';
+
+import searchRoutes from './modules/search/search.routes';
+import authRoutes from './modules/auth/auth.routes';
+import { env } from './config/env';
+
+
 const app: Application = express();
+
+if (process.env.NODE_ENV === 'production') {
+  app.set('trust proxy', 1);
+}
 
 // Security and utility middlewares
 app.use(helmet());
@@ -21,7 +53,11 @@ const apiLimiter = rateLimit({
 });
 app.use('/api/', apiLimiter);
 
-app.use(cors());
+app.use(cors({
+  origin: env.FRONTEND_URL,
+  credentials: true,
+}));
+app.use(cookieParser());
 app.use(express.json());
 app.use(morgan('combined', {
     stream: { write: (message) => logger.info(message.trim()) }
@@ -32,26 +68,6 @@ app.get('/health', (req: Request, res: Response) => {
     res.status(200).json({ status: 'ok', message: 'API is healthy' });
 });
 
-import organizationRoutes from './modules/organization/organization.routes';
-import userRoutes from './modules/user/user.routes';
-import projectRoutes from './modules/projects/project.routes';
-import taskRoutes from './modules/tasks/task.routes';
-import teamRoutes from './modules/teams/team.routes';
-import documentRoutes from './modules/documents/document.routes';
-import clientRoutes from './modules/crm/clients/client.routes';
-import contactRoutes from './modules/crm/contacts/contact.routes';
-import leadRoutes from './modules/crm/leads/lead.routes';
-import opportunityRoutes from './modules/crm/opportunities/opportunity.routes';
-import pipelineRoutes from './modules/crm/pipeline/pipeline.routes';
-import activityRoutes from './modules/crm/activities/activity.routes';
-import analyticsRoutes from './modules/analytics/analytics.routes';
-import jobsRoutes from './modules/jobs/jobs.routes';
-import { requireAuth } from './core/middlewares/authMiddleware';
-
-import swaggerUi from 'swagger-ui-express';
-import swaggerJsdoc from 'swagger-jsdoc';
-import { startWorkers } from './modules/jobs/workers';
-import { startScheduler } from './modules/jobs/scheduler';
 
 // Start background workers and scheduler (In production, this might be a separate process)
 if (process.env.NODE_ENV !== 'test') {
@@ -85,14 +101,12 @@ const swaggerSpec = swaggerJsdoc(swaggerOptions);
 app.use('/api/v1/docs', swaggerUi.serve, swaggerUi.setup(swaggerSpec));
 
 // System/Health Routes (No Auth Required)
-import systemRoutes from './modules/system/system.routes';
 app.use('/api/v1/system', systemRoutes);
 
 // Apply tenant isolation middleware to all routes after auth
-app.use('/api/v1', requireAuth);
 
 // API Routes
-// app.use('/api/v1/auth', authRoutes);
+app.use('/api/v1/auth', authRoutes);
 app.use('/api/v1/users', userRoutes);
 app.use('/api/v1/organizations', organizationRoutes);
 app.use('/api/v1/projects', projectRoutes);
@@ -107,10 +121,9 @@ app.use('/api/v1/crm/pipeline-stages', pipelineRoutes);
 app.use('/api/v1/crm/activities', activityRoutes);
 app.use('/api/v1/analytics', analyticsRoutes);
 app.use('/api/v1/jobs', jobsRoutes);
-import aiRoutes from './modules/ai/ai.routes';
 app.use('/api/v1/ai', aiRoutes);
-import searchRoutes from './modules/search/search.routes';
 app.use('/api/v1/search', searchRoutes);
+
 // Global error handler
 app.use(errorMiddleware);
 

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Card, Title, Text, Table, TableHead, TableHeaderCell, TableBody, TableRow, TableCell, Badge, Button, Flex } from '@tremor/react';
 import { PlusIcon } from '@heroicons/react/24/outline';
 
@@ -18,7 +18,7 @@ const getStatusColor = (status: string) => {
   }
 };
 
-export const LeadsPage: React.FC = () => {
+export const LeadsPage = () => {
   const [leads] = useState(mockLeads);
 
   return (

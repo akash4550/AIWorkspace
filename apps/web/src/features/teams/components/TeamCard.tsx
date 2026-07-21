@@ -1,6 +1,5 @@
-import React from 'react';
 import { Users, MoreVertical } from 'lucide-react';
-import { Card, CardBody } from '../../components/ui/Card';
+import { Card, CardBody } from '../../../components/ui/Card';
 
 interface TeamCardProps {
   team: any;

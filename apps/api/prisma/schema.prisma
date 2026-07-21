@@ -3,8 +3,9 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql"
-  url      = env("DATABASE_URL")
+  provider  = "postgresql"
+  url        = env("DATABASE_URL")
+  directUrl  = env("DIRECT_DATABASE_URL")
 }
 
 // -----------------------------------------------------------------------------
@@ -79,10 +80,15 @@ model Organization {
   name      String
   slug      String   @unique
   logo      String?
+
+  isActive  Boolean  @default(true)
+  deletedAt DateTime?
+subscriptionStatus String?
+plan String?
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  // Relationships
+  // Relations
   users           User[]
   teams           Team[]
   projects        Project[]
@@ -100,59 +106,86 @@ model Organization {
   teamInvitations TeamInvitation[]
   AIUsageLog      AIUsageLog[]
 
-  @@index([slug])
+  @@index([deletedAt])
+  @@index([isActive])
 }
-
 model User {
   id             String    @id @default(uuid())
   organizationId String
+
   firstName      String
   lastName       String
-  email          String    @unique
+  email          String    @db.Citext
   password       String
+
   role           Role      @default(EMPLOYEE)
+
   avatar         String?
+
   isActive       Boolean   @default(true)
+  emailVerified  Boolean   @default(false)
+
+  failedLoginAttempts Int      @default(0)
+  lockedUntil         DateTime?
+  passwordChangedAt   DateTime?
+
   lastLogin      DateTime?
+
   createdAt      DateTime  @default(now())
   updatedAt      DateTime  @updatedAt
   deletedAt      DateTime?
 
-  // Relationships
+  // Relations
   organization      Organization     @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+
   refreshTokens     RefreshToken[]
+
   ownedProjects     Project[]
+
   assignedTasks     Task[]           @relation("TaskAssignee")
   reportedTasks     Task[]           @relation("TaskReporter")
+
   teamMemberships   TeamMembership[]
   teamInvitations   TeamInvitation[] @relation("InvitedByUser")
   ownedTeams        Team[]
+
   notifications     Notification[]
   activityLogs      ActivityLog[]
+
   uploadedDocuments Document[]
 
-  // CRM Relations
-  clients       Client[]
-  assignedLeads Lead[]
-  crmActivities CRMActivity[]
-  AIUsageLog    AIUsageLog[]
+  clients           Client[]
+  assignedLeads     Lead[]
+  crmActivities     CRMActivity[]
+  AIUsageLog        AIUsageLog[]
+
+  @@unique([organizationId, email])
 
   @@index([organizationId])
-  @@index([email])
+  @@index([organizationId, role])
+  @@index([organizationId, isActive])
+  @@index([organizationId, deletedAt])
+  @@index([organizationId, createdAt])
 }
 
 model RefreshToken {
   id        String    @id @default(uuid())
-  token     String    @unique
+tokenHash String @unique
+device String?
+ipAddress String?
+userAgent String?
   userId    String
   expiresAt DateTime
   revokedAt DateTime?
   createdAt DateTime  @default(now())
-
+lastUsedAt DateTime?
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
+
   @@index([userId])
-  @@index([token])
+  @@index([expiresAt])
+  @@index([userId, revokedAt])
+  @@index([userId, expiresAt])
 }
 
 // -----------------------------------------------------------------------------
@@ -176,8 +209,10 @@ model Team {
   memberships  TeamMembership[]
   invitations  TeamInvitation[]
 
-  @@index([organizationId])
-  @@index([ownerId])
+@@index([organizationId, deletedAt])
+  @@unique([organizationId, name])
+@@index([organizationId])
+@@index([ownerId])
 }
 
 model TeamMembership {
@@ -212,6 +247,7 @@ model TeamInvitation {
   @@index([organizationId])
   @@index([teamId])
   @@index([email])
+  @@unique([teamId, email])
 }
 
 model Project {
@@ -235,11 +271,13 @@ model Project {
   tasks        Task[]
   documents    Document[]
 
+  @@unique([organizationId, name])
+@@index([organizationId, createdAt])
+@@index([organizationId, deletedAt])
   @@unique([organizationId, key])
-  @@index([organizationId])
-  @@index([ownerId])
-  @@index([status])
-  @@index([key])
+  @@index([organizationId, status])
+@@index([organizationId, ownerId])
+@@index([key])
 }
 
 model Task {
@@ -256,12 +294,12 @@ model Task {
   dueDate        DateTime?
   estimatedHours Float?
   completedAt    DateTime?
-  position       Float
+  position Decimal @db.Decimal(18,6)
   archived       Boolean      @default(false)
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
   deletedAt      DateTime?
-
+completedById String?
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   project      Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
   parentTask   Task?        @relation("Subtasks", fields: [parentTaskId], references: [id])
@@ -270,11 +308,15 @@ model Task {
   reporter     User         @relation("TaskReporter", fields: [reporterId], references: [id])
   documents    Document[]
 
-  @@index([organizationId])
-  @@index([projectId])
-  @@index([status])
-  @@index([assigneeId])
-  @@index([reporterId])
+@@index([organizationId, projectId])
+@@index([organizationId, projectId, status])
+@@index([organizationId, assigneeId])
+@@index([organizationId, priority])
+@@index([organizationId, dueDate])
+@@index([organizationId, archived])
+@@index([organizationId, createdAt])
+@@index([organizationId, deletedAt])
+@@index([reporterId])
 }
 
 enum ClientStatus {
@@ -299,6 +341,21 @@ enum CRMActivityType {
   STATUS_CHANGE
 }
 
+enum AIProvider {
+  OPENAI
+  GEMINI
+  ANTHROPIC
+  MOCK
+}
+
+
+enum EntityType {
+    TASK
+    PROJECT
+    CLIENT
+    DOCUMENT
+    USER
+}
 model Client {
   id             String       @id @default(uuid())
   organizationId String
@@ -319,8 +376,12 @@ model Client {
   contacts     Contact[]
   activities   CRMActivity[]
 
-  @@index([organizationId])
-  @@index([ownerId])
+  @@index([organizationId, deletedAt])
+@@index([organizationId, createdAt])
+ @@unique([organizationId, name])
+@@index([organizationId])
+@@index([ownerId])
+@@index([organizationId, status])
 }
 
 model Contact {
@@ -339,8 +400,10 @@ model Contact {
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   client       Client       @relation(fields: [clientId], references: [id], onDelete: Cascade)
 
+@@index([email])
   @@index([organizationId])
   @@index([clientId])
+  
 }
 
 model Lead {
@@ -348,10 +411,10 @@ model Lead {
   organizationId String
   title          String
   source         String?
-  score          Float?     @default(0)
+  score          Int        @default(0) // 0-100
   status         LeadStatus @default(NEW)
   assignedTo     String?
-  expectedValue  Float?
+  expectedValue  Decimal?   @db.Decimal(12,2)
   createdAt      DateTime   @default(now())
   updatedAt      DateTime   @updatedAt
   deletedAt      DateTime?
@@ -361,6 +424,7 @@ model Lead {
   opportunities Opportunity[]
   activities    CRMActivity[]
 
+  @@index([organizationId, score])
   @@index([organizationId])
   @@index([assignedTo])
 }
@@ -369,15 +433,16 @@ model PipelineStage {
   id             String   @id @default(uuid())
   organizationId String
   name           String
-  probability    Float    @default(0)
-  position       Float
+  probability    Int    @default(0)
+  position Decimal @db.Decimal(18,6)
   createdAt      DateTime @default(now())
   updatedAt      DateTime @updatedAt
 
   organization  Organization  @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   opportunities Opportunity[]
 
-  @@index([organizationId])
+  @@unique([organizationId, name])
+@@index([organizationId])
 }
 
 model Opportunity {
@@ -385,9 +450,9 @@ model Opportunity {
   organizationId  String
   leadId          String
   stageId         String
-  expectedRevenue Float?
+  expectedRevenue Decimal? @db.Decimal(12,2)
   closeDate       DateTime?
-  probability     Float?
+probability Int @default(0)
   createdAt       DateTime  @default(now())
   updatedAt       DateTime  @updatedAt
   deletedAt       DateTime?
@@ -397,16 +462,15 @@ model Opportunity {
   stage        PipelineStage @relation(fields: [stageId], references: [id])
   activities   CRMActivity[]
 
-  @@index([organizationId])
-  @@index([leadId])
-  @@index([stageId])
+@@index([organizationId, stageId])
+@@index([organizationId, leadId])
 }
 
 model CRMActivity {
   id             String          @id @default(uuid())
   organizationId String
   type           CRMActivityType
-  content        String          @db.Text
+  description       String          @db.Text
   clientId       String?
   leadId         String?
   opportunityId  String?
@@ -420,6 +484,7 @@ model CRMActivity {
   opportunity  Opportunity? @relation(fields: [opportunityId], references: [id], onDelete: Cascade)
   createdBy    User         @relation(fields: [createdById], references: [id])
 
+@@index([organizationId, createdAt])
   @@index([organizationId])
   @@index([clientId])
   @@index([leadId])
@@ -454,8 +519,8 @@ model Notification {
   user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
-  @@index([userId])
-  @@index([read])
+  @@index([userId, read])
+@@index([organizationId, createdAt])
 }
 
 model ActivityLog {
@@ -463,72 +528,92 @@ model ActivityLog {
   organizationId String
   userId         String?
   type           ActivityType
-  entityType     String
+  entityType     EntityType
   entityId       String
   metadata       Json?
+
+  ipAddress      String?
+  userAgent      String?
+
   createdAt      DateTime     @default(now())
   updatedAt      DateTime     @updatedAt
 
   organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
   user         User?        @relation(fields: [userId], references: [id], onDelete: SetNull)
 
-  @@index([organizationId])
-  @@index([userId])
-  @@index([type])
+  @@index([organizationId, userId, createdAt])
+  @@index([organizationId, createdAt])
+  @@index([organizationId, type])
   @@index([entityType, entityId])
 }
 
 model Document {
-  id               String    @id @default(uuid())
+  id               String   @id @default(uuid())
   organizationId   String
   projectId        String?
   taskId           String?
   uploadedById     String
+
   fileName         String
   originalName     String
   mimeType         String
   fileSize         Int
+
   storageKey       String
-  storageProvider  String    @default("local")
-  version          Int       @default(1)
-  isLatest         Boolean   @default(true)
+  storageProvider  String @default("local")
+
+  checksum         String?          // SHA-256 for duplicate detection
+
+  version          Int @default(1)
+  isLatest         Boolean @default(true)
+
   parentDocumentId String?
-  createdAt        DateTime  @default(now())
-  updatedAt        DateTime  @updatedAt
+
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
   deletedAt        DateTime?
 
   organization   Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  project        Project?     @relation(fields: [projectId], references: [id], onDelete: SetNull)
-  task           Task?        @relation(fields: [taskId], references: [id], onDelete: SetNull)
-  uploadedBy     User         @relation(fields: [uploadedById], references: [id])
-  parentDocument Document?    @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
-  versions       Document[]   @relation("DocumentVersions")
+  project        Project? @relation(fields: [projectId], references: [id], onDelete: SetNull)
+  task           Task? @relation(fields: [taskId], references: [id], onDelete: SetNull)
+  uploadedBy     User @relation(fields: [uploadedById], references: [id])
+  parentDocument Document? @relation("DocumentVersions", fields: [parentDocumentId], references: [id])
+  versions       Document[] @relation("DocumentVersions")
 
-  @@index([organizationId])
-  @@index([projectId])
-  @@index([taskId])
+  @@index([organizationId, isLatest])
+  @@index([organizationId, deletedAt])
+  @@index([organizationId, projectId])
+  @@index([organizationId, taskId])
   @@index([parentDocumentId])
 }
-
 model AIUsageLog {
-  id               String   @id @default(uuid())
+  id               String      @id @default(uuid())
   organizationId   String
   userId           String
-  provider         String
-  model            String
-  promptTokens     Int      @default(0)
-  completionTokens Int      @default(0)
-  totalTokens      Int      @default(0)
-  latencyMs        Int?
-  cost             Float?   @default(0)
-  feature          String? // e.g., 'task_summary', 'assistant'
-  success          Boolean  @default(true)
-  errorMessage     String?  @db.Text
-  createdAt        DateTime @default(now())
 
-  organization Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
-  user         User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider         AIProvider
+  model            String
+  requestId        String?
+
+  promptTokens     Int         @default(0)
+  completionTokens Int         @default(0)
+  totalTokens      Int         @default(0)
+
+  latencyMs        Int?
+  cost             Decimal?    @default(0) @db.Decimal(12,4)
+
+  feature          String
+  success          Boolean     @default(true)
+  errorMessage     String?     @db.Text
+
+  createdAt        DateTime    @default(now())
+
+  organization     Organization @relation(fields: [organizationId], references: [id], onDelete: Cascade)
+  user             User         @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@index([organizationId])
   @@index([userId])
+  @@index([organizationId, feature])
+  @@index([organizationId, createdAt])
+  @@index([requestId])
 }

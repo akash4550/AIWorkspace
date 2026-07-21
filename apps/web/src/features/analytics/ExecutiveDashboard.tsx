@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Title, Grid, Card, Text } from '@tremor/react';
 import { FilterPanel } from '../../components/analytics/FilterPanel';
 import { MetricCard } from '../../components/analytics/MetricCard';
 import { useReport, MetricFilter } from './hooks/useAnalytics';
 
-export const ExecutiveDashboard: React.FC = () => {
+export const ExecutiveDashboard = () => {
   const [filters, setFilters] = useState<MetricFilter>({});
 
   const { data: report, isLoading } = useReport('EXECUTIVE_SUMMARY', filters);

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { Card, TextInput, Button, Text } from '@tremor/react';
+import { useState, type FC, type FormEvent } from 'react';
+import { Card, TextInput, Button } from '@tremor/react';
 import { Bot, Send, X, Loader2 } from 'lucide-react';
 import { useAssistant } from './hooks/useAI';
 
@@ -8,7 +8,7 @@ interface Message {
   content: string;
 }
 
-export const AIAssistantPanel: React.FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
+export const AIAssistantPanel: FC<{ isOpen: boolean; onClose: () => void }> = ({ isOpen, onClose }) => {
   const [query, setQuery] = useState('');
   const [messages, setMessages] = useState<Message[]>([
     { role: 'assistant', content: 'Hello! I am your AIWorkspace Assistant. How can I help you today?' }
@@ -18,7 +18,7 @@ export const AIAssistantPanel: React.FC<{ isOpen: boolean; onClose: () => void }
 
   if (!isOpen) return null;
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = (e: FormEvent) => {
     e.preventDefault();
     if (!query.trim() || isPending) return;
 

@@ -1,24 +1,60 @@
 import { Role } from '@prisma/client';
 
 export interface CreateUserDto {
-    firstName: string;
-    lastName: string;
-    email: string;
-    role: Role;
-    password?: string; // Optional because we might auto-generate it or send invite
+  email: string;
+  password: string;
+  firstName: string;
+  lastName: string;
+  role: Role;
 }
 
-export interface UpdateUserDto {
-    firstName?: string;
-    lastName?: string;
-    role?: Role;
-    avatar?: string | null;
+export interface UserProfileUpdateDto {
+  firstName?: string;
+  lastName?: string;
+  avatar?: string | null;
+}
+
+export interface UserStatusUpdateDto {
+  isActive: boolean;
+}
+
+export interface UserRoleUpdateDto {
+  role: Role;
+}
+
+export interface UserUpdateActor {
+  id: string;
+  organizationId: string;
+  role: Role;
+}
+
+export interface UserResponseDto {
+  id: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  avatar: string | null;
+  role: Role;
+  organizationId: string;
+  isActive: boolean;
+  emailVerified: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+export interface UserListResponseDto {
+  users: UserResponseDto[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
 }
 
 export interface UserQueryDto {
-    page?: number;
-    limit?: number;
-    search?: string;
-    role?: Role;
-    isActive?: boolean;
+  page?: number;
+  limit?: number;
+  search?: string;
+  role?: Role;
 }

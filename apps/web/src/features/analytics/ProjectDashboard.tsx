@@ -1,11 +1,11 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { Title, Grid, Card, Text } from '@tremor/react';
 import { FilterPanel } from '../../components/analytics/FilterPanel';
 import { MetricCard } from '../../components/analytics/MetricCard';
 import { DistributionChart } from '../../components/analytics/DistributionChart';
 import { useReport, MetricFilter } from './hooks/useAnalytics';
 
-export const ProjectDashboard: React.FC = () => {
+export const ProjectDashboard = () => {
   const [filters, setFilters] = useState<MetricFilter>({});
 
   const { data: report, isLoading } = useReport('PROJECT_HEALTH', filters);

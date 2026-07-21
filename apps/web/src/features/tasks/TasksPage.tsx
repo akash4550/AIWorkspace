@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { api } from '../../lib/api';
 import { KanbanBoard } from './components/KanbanBoard';
-import { Search, Plus, List, Trello } from 'lucide-react';
+import { Search, Plus, List, LayoutGrid } from 'lucide-react';
 import { Button } from '../../components/ui/Button';
 
 export const TasksPage = () => {
@@ -51,7 +51,7 @@ export const TasksPage = () => {
             onClick={() => setViewMode('kanban')}
             className={`p-1.5 rounded ${viewMode === 'kanban' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'text-gray-500'}`}
           >
-            <Trello className="w-4 h-4" />
+            <LayoutGrid className="w-4 h-4" />
           </button>
           <button
             onClick={() => setViewMode('list')}

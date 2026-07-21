@@ -1,17 +1,19 @@
-import React from 'react';
+import { useEffect, useState } from 'react';
 import { useUiStore } from '../../store/uiStore';
 import { Menu, Search } from 'lucide-react';
 import { ThemeToggle } from './ThemeToggle';
 import { NotificationBell } from '../ui/NotificationBell';
 import { useLocation } from 'react-router-dom';
 import { GlobalSearchOverlay } from '../../features/search/GlobalSearchOverlay';
+import { useAuth } from '../../providers/AuthProvider';
 
 export const Topbar = () => {
   const { toggleSidebar } = useUiStore();
   const location = useLocation();
-  const [isSearchOpen, setIsSearchOpen] = React.useState(false);
+  const { user, organization } = useAuth();
+  const [isSearchOpen, setIsSearchOpen] = useState(false);
 
-  React.useEffect(() => {
+  useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if ((e.metaKey || e.ctrlKey) && e.key === 'k') {
         e.preventDefault();
@@ -25,6 +27,9 @@ export const Topbar = () => {
   // Simple breadcrumb generator
   const pathnames = location.pathname.split('/').filter(x => x);
   const breadcrumb = pathnames.length > 0 ? pathnames[pathnames.length - 1] : 'Dashboard';
+  const userInitials = user
+    ? `${user.firstName.charAt(0)}${user.lastName.charAt(0)}`.toUpperCase()
+    : '';
 
   return (
     <header className="h-16 bg-white dark:bg-slate-800 border-b border-gray-200 dark:border-slate-700 flex items-center justify-between px-4 sm:px-6 transition-colors">
@@ -37,7 +42,7 @@ export const Topbar = () => {
         </button>
         
         <div className="hidden sm:flex items-center text-sm">
-          <span className="text-gray-500 dark:text-gray-400">Organization</span>
+          <span className="text-gray-500 dark:text-gray-400">{organization?.name}</span>
           <span className="mx-2 text-gray-400 dark:text-gray-600">/</span>
           <span className="text-gray-900 dark:text-white font-medium capitalize">{breadcrumb}</span>
         </div>
@@ -59,9 +64,11 @@ export const Topbar = () => {
 
         <ThemeToggle />
 
-        {/* Profile Menu Placeholder */}
-        <div className="w-8 h-8 rounded-full bg-primary-100 border border-primary-200 dark:bg-primary-900/50 dark:border-primary-800 flex items-center justify-center text-sm font-bold text-primary-700 dark:text-primary-400 cursor-pointer">
-          A
+        <div
+          className="w-8 h-8 rounded-full bg-primary-100 border border-primary-200 dark:bg-primary-900/50 dark:border-primary-800 flex items-center justify-center text-sm font-bold text-primary-700 dark:text-primary-400"
+          title={user ? `${user.firstName} ${user.lastName}` : undefined}
+        >
+          {userInitials}
         </div>
       </div>
     </header>

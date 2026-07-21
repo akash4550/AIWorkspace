@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
-import { Title, Grid, Card } from '@tremor/react';
+import { useState } from 'react';
+import { Grid } from '@tremor/react';
 import { FilterPanel } from '../../components/analytics/FilterPanel';
 import { MetricCard } from '../../components/analytics/MetricCard';
 import { useReport, MetricFilter } from './hooks/useAnalytics';
 
-export const AnalyticsCRMOverview: React.FC = () => {
+export const AnalyticsCRMOverview = () => {
   const [filters, setFilters] = useState<MetricFilter>({});
 
   const { data: report, isLoading } = useReport('CRM_OVERVIEW', filters);

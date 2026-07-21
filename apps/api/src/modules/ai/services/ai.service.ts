@@ -1,74 +1,168 @@
-import { PrismaClient } from '@prisma/client';
-import { AIProvider, AICompletionRequest } from '../providers/ai-provider.interface';
+import {
+  AIProvider as PrismaAIProvider,
+} from '@prisma/client';
+
+import { prisma } from '../../../config/prisma';
+import { AppError } from '../../../core/errors/AppError';
+import {
+  AICompletionRequest,
+  AICompletionResponse,
+  AIProvider,
+} from '../providers/ai-provider.interface';
 import { MockAIProvider } from '../providers/mock.provider';
 
-const prisma = new PrismaClient();
-
 export class AIService {
-  private provider: AIProvider;
+  private readonly provider: AIProvider;
 
-  constructor() {
-    // In the future, this could be dynamic based on env vars (e.g., 'openai' vs 'anthropic')
-    this.provider = new MockAIProvider();
+  constructor(
+    provider: AIProvider = new MockAIProvider(),
+  ) {
+    this.provider = provider;
   }
 
-  /**
-   * Generates a completion and logs the usage to the database for billing/tracking.
-   */
   async generateCompletion(
     organizationId: string,
     userId: string,
     feature: string,
-    request: AICompletionRequest
-  ) {
-    if (!organizationId) throw new Error('organizationId is required for AI Usage Tracking');
+    request: AICompletionRequest,
+  ): Promise<AICompletionResponse> {
+    if (!organizationId) {
+      throw new AppError(
+        'Organization context is required for AI usage',
+        400,
+      );
+    }
 
-    const startTime = Date.now();
-    
+    if (!userId) {
+      throw new AppError(
+        'User context is required for AI usage',
+        400,
+      );
+    }
+
+    const normalizedFeature = feature.trim();
+
+    if (!normalizedFeature) {
+      throw new AppError(
+        'AI feature is required',
+        400,
+      );
+    }
+
+    const prompt = request.prompt.trim();
+
+    if (!prompt) {
+      throw new AppError(
+        'AI prompt is required',
+        400,
+      );
+    }
+
+    const normalizedRequest: AICompletionRequest = {
+      ...request,
+      prompt,
+      systemPrompt:
+        request.systemPrompt?.trim() || undefined,
+    };
+
+    const provider = this.resolveProvider();
+    const startedAt = Date.now();
+
+    let response: AICompletionResponse;
+
     try {
-      const response = await this.provider.generateCompletion(request);
-      const latencyMs = Date.now() - startTime;
+      response =
+        await this.provider.generateCompletion(
+          normalizedRequest,
+        );
+    } catch (error: unknown) {
+      const message =
+        error instanceof Error
+          ? error.message
+          : 'Unknown AI provider error';
 
-      // Log successful usage asynchronously (don't await to block the return)
-      this.logUsage(organizationId, userId, feature, true, latencyMs, response).catch(err => {
-        console.error('Failed to log AI Usage:', err);
-      });
-
-      return response;
-    } catch (error: any) {
-      const latencyMs = Date.now() - startTime;
-      
-      this.logUsage(organizationId, userId, feature, false, latencyMs, null, error.message).catch(err => {
-        console.error('Failed to log AI Error Usage:', err);
+      await this.logUsage({
+        organizationId,
+        userId,
+        feature: normalizedFeature,
+        provider,
+        success: false,
+        latencyMs: Date.now() - startedAt,
+        response: null,
+        errorMessage: message,
       });
 
       throw error;
     }
+
+    await this.logUsage({
+      organizationId,
+      userId,
+      feature: normalizedFeature,
+      provider,
+      success: true,
+      latencyMs: Date.now() - startedAt,
+      response,
+    });
+
+    return response;
   }
 
-  private async logUsage(
-    organizationId: string, 
-    userId: string, 
-    feature: string, 
-    success: boolean, 
-    latencyMs: number, 
-    response: any, 
-    errorMessage?: string
-  ) {
+  private resolveProvider():
+    PrismaAIProvider {
+    const providerName =
+      this.provider.name.trim().toUpperCase();
+
+    if (
+      !Object.values(PrismaAIProvider).includes(
+        providerName as PrismaAIProvider,
+      )
+    ) {
+      throw new AppError(
+        `Unsupported AI provider: ${this.provider.name}`,
+        500,
+      );
+    }
+
+    return providerName as PrismaAIProvider;
+  }
+
+  private async logUsage({
+    organizationId,
+    userId,
+    feature,
+    provider,
+    success,
+    latencyMs,
+    response,
+    errorMessage,
+  }: {
+    organizationId: string;
+    userId: string;
+    feature: string;
+    provider: PrismaAIProvider;
+    success: boolean;
+    latencyMs: number;
+    response: AICompletionResponse | null;
+    errorMessage?: string;
+  }): Promise<void> {
     await prisma.aIUsageLog.create({
       data: {
         organizationId,
         userId,
         feature,
-        provider: this.provider.name,
-        model: response?.model || 'unknown',
-        promptTokens: response?.usage?.promptTokens || 0,
-        completionTokens: response?.usage?.completionTokens || 0,
-        totalTokens: response?.usage?.totalTokens || 0,
+        provider,
+        model: response?.model ?? 'unknown',
+        promptTokens:
+          response?.usage.promptTokens ?? 0,
+        completionTokens:
+          response?.usage.completionTokens ?? 0,
+        totalTokens:
+          response?.usage.totalTokens ?? 0,
         latencyMs,
         success,
-        errorMessage
-      }
+        errorMessage,
+      },
     });
   }
 }
