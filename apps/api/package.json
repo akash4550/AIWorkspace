@@ -11,7 +11,8 @@
     "build": "tsc",
     "test": "jest",
     "test:auth": "jest src/modules/auth/__tests__/auth.integration.test.ts --runInBand",
-    "test:socket-auth": "jest src/modules/realtime/__tests__/socket.integration.test.ts --runInBand"
+    "test:socket-auth": "jest src/modules/realtime/__tests__/socket.integration.test.ts --runInBand",
+    "migrate:deploy": "prisma migrate deploy"
   },
   "keywords": [],
   "author": "",

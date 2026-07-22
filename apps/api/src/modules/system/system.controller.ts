@@ -1,9 +1,7 @@
 import { Request, Response } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from '../../config/prisma';
 import { getRedisClient } from '../../core/redis/redis.client';
 import { logger } from '../../core/utils/logger';
-
-const prisma = new PrismaClient();
 
 export class SystemController {
   
@@ -39,7 +37,7 @@ export class SystemController {
       logger.error('Readiness check failed', { error: error.message });
       res.status(503).json({
         status: 'unavailable',
-        error: error.message,
+        error: 'Service dependencies are unavailable',
         timestamp: new Date().toISOString()
       });
     }

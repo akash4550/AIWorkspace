@@ -1,14 +1,11 @@
 name: AIWorkspace CI
-
 on:
   push:
     branches:
       - main
-      - backup/pre-chatgpt-plus
   pull_request:
     branches:
       - main
-      - backup/pre-chatgpt-plus
 
 jobs:
   build-and-test:
@@ -53,10 +50,8 @@ jobs:
       - name: Generate Prisma client
         run: npm run generate
 
-      - name: Prepare authentication integration database
-        run: |
-          PGPASSWORD=aiworkspace_test psql -h 127.0.0.1 -U aiworkspace_test -d aiworkspace_test -c "CREATE EXTENSION IF NOT EXISTS citext;"
-          npm exec --workspace=api -- prisma db push --skip-generate --accept-data-loss
+      - name: Deploy committed database migrations
+        run: npm run migrate:deploy --workspace=api
 
       - name: Type-check workspaces with their declared compilers
         run: npm run typecheck
@@ -95,7 +90,7 @@ jobs:
         run: npm run docker:build
 
       - name: Start isolated production topology
-        run: docker compose -f docker-compose.production.yml up -d --no-build
+        run: docker compose -f docker-compose.production.yml up -d --no-build --wait postgres redis api web
 
       - name: Prepare isolated production authentication fixture
         run: npm run smoke:prepare-auth
