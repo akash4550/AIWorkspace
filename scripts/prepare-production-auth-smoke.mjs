@@ -1,8 +1,6 @@
 import { spawnSync } from 'node:child_process';
 
 const composeFile = 'docker-compose.production.yml';
-const databaseUser = process.env.DB_USER || 'aiworkspace';
-const databaseName = process.env.DB_NAME || 'aiworkspace_prod';
 const organizationId = process.env.SMOKE_AUTH_ORGANIZATION_ID
   || '11111111-1111-4111-8111-111111111111';
 const userId = process.env.SMOKE_AUTH_USER_ID
@@ -21,17 +19,6 @@ const runCompose = (args) => {
     throw new Error(result.stderr || result.stdout || `Docker Compose failed: ${args.join(' ')}`);
   }
 };
-
-runCompose([
-  'exec', '-T', 'postgres',
-  'psql', '-v', 'ON_ERROR_STOP=1', '-U', databaseUser, '-d', databaseName,
-  '-c', 'CREATE EXTENSION IF NOT EXISTS citext;',
-]);
-
-runCompose([
-  'exec', '-T', 'api',
-  'npx', '--no-install', 'prisma', 'db', 'push', '--skip-generate', '--accept-data-loss',
-]);
 
 const seedSource = `
 const bcrypt = require('bcrypt');

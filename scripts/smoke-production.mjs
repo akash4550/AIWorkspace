@@ -261,13 +261,19 @@ for (const source of scriptSources) {
 }
 console.log('PASS production browser bundle has no localhost API dependency');
 
-await fetchUntilReady(new URL('/api/v1/system/live', webUrl), (body) => {
+await fetchUntilReady(new URL('/api/v1/system/ready', webUrl), (body) => {
   const payload = JSON.parse(body);
-  if (payload.status !== 'ok') {
-    throw new Error(`Unexpected API liveness payload: ${body}`);
+
+  if (
+    payload.status !== 'ready' ||
+    payload.database !== 'connected' ||
+    payload.redis !== 'connected'
+  ) {
+    throw new Error(`Unexpected API readiness payload: ${body}`);
   }
 });
-console.log('PASS /api reaches the API through Nginx');
+
+console.log('PASS API readiness confirms database and Redis through Nginx');
 
 await assertSocketProxy();
 console.log('PASS Socket.IO WebSocket upgrade reaches API authentication through Nginx');
