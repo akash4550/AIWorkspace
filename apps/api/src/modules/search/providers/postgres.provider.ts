@@ -1,113 +1,253 @@
-import { PrismaClient } from '@prisma/client';
-import { SearchProvider, SearchQuery, SearchResult, SearchResultItem } from './search-provider.interface';
+import { PERMISSIONS } from '../../../core/auth/permissions';
+import { ROLE_PERMISSIONS } from '../../../core/auth/rolePermissions';
+import { prisma } from '../../../config/prisma';
+import {
+  SearchModule,
+  SearchProvider,
+  SearchQuery,
+  SearchResult,
+  SearchResultItem,
+} from './search-provider.interface';
 
-const prisma = new PrismaClient();
+const ALL_SEARCH_MODULES: SearchModule[] = [
+  'projects',
+  'tasks',
+  'crm',
+];
 
-export class PostgresSearchProvider implements SearchProvider {
+export class PostgresSearchProvider
+  implements SearchProvider {
   readonly name = 'postgres';
 
-  async search(query: SearchQuery): Promise<SearchResult> {
-    const { organizationId, term, limit = 20, offset = 0, modules } = query;
-    const items: SearchResultItem[] = [];
-    
-    // Safety check - we refuse to query without organizationId
-    if (!organizationId) throw new Error('Search requires tenant isolation');
-    
-    // For local dev simulation, we query relevant models concurrently
-    // In production, this would use raw SQL `to_tsvector` against an indexed materialized view
-    const promises = [];
+  async search(
+    query: SearchQuery,
+  ): Promise<SearchResult> {
+    const {
+      organizationId,
+      role,
+      term,
+      modules,
+      limit,
+      offset,
+    } = query;
 
-    const shouldSearch = (moduleName: string) => !modules || modules.includes(moduleName);
+    if (!organizationId) {
+      throw new Error(
+        'Search requires tenant isolation',
+      );
+    }
+
+    const permissions = ROLE_PERMISSIONS[role];
+
+    const allowedModules =
+      ALL_SEARCH_MODULES.filter((module) => {
+        switch (module) {
+          case 'projects':
+            return permissions.includes(
+              PERMISSIONS.PROJECT.READ,
+            );
+
+          case 'tasks':
+            return permissions.includes(
+              PERMISSIONS.TASK.READ,
+            );
+
+          case 'crm':
+            return permissions.includes(
+              PERMISSIONS.CRM.READ,
+            );
+        }
+      });
+
+    const requestedModules =
+      modules ?? allowedModules;
+
+    const searchableModules =
+      requestedModules.filter((module) =>
+        allowedModules.includes(module),
+      );
+
+    const shouldSearch = (
+      moduleName: SearchModule,
+    ): boolean =>
+      searchableModules.includes(moduleName);
+
+    const queryLimit = offset + limit;
+
+    const searches: Promise<
+      SearchResultItem[]
+    >[] = [];
 
     if (shouldSearch('projects')) {
-      promises.push(
-        prisma.project.findMany({
-          where: {
-            organizationId,
-            OR: [
-              { name: { contains: term, mode: 'insensitive' } },
-              { description: { contains: term, mode: 'insensitive' } }
-            ]
-          },
-          take: limit,
-        }).then(res => res.map(p => ({
-          id: p.id,
-          module: 'projects',
-          title: p.name,
-          description: p.description?.substring(0, 100) || '',
-          url: `/projects`,
-          score: p.name.toLowerCase().includes(term.toLowerCase()) ? 1.0 : 0.5
-        })))
+      searches.push(
+        prisma.project
+          .findMany({
+            where: {
+              organizationId,
+              deletedAt: null,
+              OR: [
+                {
+                  name: {
+                    contains: term,
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  description: {
+                    contains: term,
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+            },
+            take: queryLimit,
+          })
+          .then((projects) =>
+            projects.map(
+              (project): SearchResultItem => ({
+                id: project.id,
+                module: 'projects',
+                title: project.name,
+                description:
+                  project.description?.substring(
+                    0,
+                    100,
+                  ) ?? '',
+                url: `/projects`,
+                score: project.name
+                  .toLowerCase()
+                  .includes(term.toLowerCase())
+                  ? 1
+                  : 0.5,
+              }),
+            ),
+          ),
       );
     }
 
     if (shouldSearch('tasks')) {
-      promises.push(
-        prisma.task.findMany({
-          where: {
-            organizationId,
-            OR: [
-              { title: { contains: term, mode: 'insensitive' } },
-              { description: { contains: term, mode: 'insensitive' } }
-            ]
-          },
-          take: limit,
-        }).then(res => res.map(t => ({
-          id: t.id,
-          module: 'tasks',
-          title: t.title,
-          description: t.description?.substring(0, 100) || '',
-          url: `/tasks`,
-          score: t.title.toLowerCase().includes(term.toLowerCase()) ? 1.0 : 0.5
-        })))
+      searches.push(
+        prisma.task
+          .findMany({
+            where: {
+              organizationId,
+              deletedAt: null,
+              OR: [
+                {
+                  title: {
+                    contains: term,
+                    mode: 'insensitive',
+                  },
+                },
+                {
+                  description: {
+                    contains: term,
+                    mode: 'insensitive',
+                  },
+                },
+              ],
+            },
+            take: queryLimit,
+          })
+          .then((tasks) =>
+            tasks.map(
+              (task): SearchResultItem => ({
+                id: task.id,
+                module: 'tasks',
+                title: task.title,
+                description:
+                  task.description?.substring(
+                    0,
+                    100,
+                  ) ?? '',
+                url: `/tasks`,
+                score: task.title
+                  .toLowerCase()
+                  .includes(term.toLowerCase())
+                  ? 1
+                  : 0.5,
+              }),
+            ),
+          ),
       );
     }
 
     if (shouldSearch('crm')) {
-      promises.push(
-        prisma.client.findMany({
-          where: {
-            organizationId,
-            name: { contains: term, mode: 'insensitive' }
-          },
-          take: limit,
-        }).then(res => res.map(c => ({
-          id: c.id,
-          module: 'crm',
-          title: c.name,
-          description: `Client in ${c.industry || 'Unknown Industry'}`,
-          url: `/crm/clients/${c.id}`,
-          score: 1.0
-        })))
+      searches.push(
+        prisma.client
+          .findMany({
+            where: {
+              organizationId,
+              deletedAt: null,
+              name: {
+                contains: term,
+                mode: 'insensitive',
+              },
+            },
+            take: queryLimit,
+          })
+          .then((clients) =>
+            clients.map(
+              (client): SearchResultItem => ({
+                id: client.id,
+                module: 'crm',
+                title: client.name,
+                description:
+                  `Client in ${
+                    client.industry ??
+                    'Unknown Industry'
+                  }`,
+                url: `/crm/clients/${client.id}`,
+                score: 1,
+              }),
+            ),
+          ),
       );
-      
-      promises.push(
-        prisma.lead.findMany({
-          where: {
-            organizationId,
-            title: { contains: term, mode: 'insensitive' }
-          },
-          take: limit,
-        }).then(res => res.map(l => ({
-          id: l.id,
-          module: 'crm',
-          title: l.title,
-          description: `Lead (Status: ${l.status})`,
-          url: `/crm/leads`,
-          score: 1.0
-        })))
+
+      searches.push(
+        prisma.lead
+          .findMany({
+            where: {
+              organizationId,
+              deletedAt: null,
+              title: {
+                contains: term,
+                mode: 'insensitive',
+              },
+            },
+            take: queryLimit,
+          })
+          .then((leads) =>
+            leads.map(
+              (lead): SearchResultItem => ({
+                id: lead.id,
+                module: 'crm',
+                title: lead.title,
+                description:
+                  `Lead (Status: ${lead.status})`,
+                url: `/crm/leads`,
+                score: 1,
+              }),
+            ),
+          ),
       );
     }
 
-    const resultsArray = await Promise.all(promises);
-    resultsArray.forEach(arr => items.push(...arr));
+    const resultGroups =
+      await Promise.all(searches);
 
-    // Sort by pseudo-score and truncate to limit
-    const sortedItems = items.sort((a, b) => b.score - a.score).slice(offset, offset + limit);
+    const items = resultGroups.flat();
+
+    const sortedItems = items
+      .sort(
+        (left, right) =>
+          right.score - left.score,
+      )
+      .slice(offset, offset + limit);
 
     return {
       total: items.length,
-      items: sortedItems
+      items: sortedItems,
     };
   }
 }
