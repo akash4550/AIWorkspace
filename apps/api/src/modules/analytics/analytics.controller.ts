@@ -1,5 +1,11 @@
-import { Request, Response, NextFunction } from 'express';
+import { Request, Response } from 'express';
+
+import { getValidatedRequest } from '../../core/middlewares/validateRequest';
 import { AnalyticsService } from './analytics.service';
+import type {
+  GetMetricRequest,
+  GetReportRequest,
+} from './analytics.dto';
 
 export class AnalyticsController {
   private service: AnalyticsService;
@@ -8,44 +14,29 @@ export class AnalyticsController {
     this.service = new AnalyticsService();
   }
 
-  async getMetric(req: Request, res: Response, next: NextFunction) {
-    try {
-      const organizationId = req.user!.organizationId;
-      const metricName = String(req.params.metricName);
-      
-      // Parse query string into filters
-      const filters = {
-        startDate: req.query.startDate as string,
-        endDate: req.query.endDate as string,
-        projectId: req.query.projectId as string,
-        teamId: req.query.teamId as string,
-        userId: req.query.userId as string,
-      };
+  async getMetric(req: Request, res: Response) {
+    const { params, query } =
+      getValidatedRequest<GetMetricRequest>(req);
 
-      const result = await this.service.getMetric(organizationId, metricName, filters);
-      res.status(200).json({ data: result });
-    } catch (error) {
-      next(error);
-    }
+    const result = await this.service.getMetric(
+      req.user!.organizationId,
+      params.metricName,
+      query,
+    );
+
+    res.status(200).json({ data: result });
   }
 
-  async getReport(req: Request, res: Response, next: NextFunction) {
-    try {
-      const organizationId = req.user!.organizationId;
-      const reportType = String(req.params.reportType);
+  async getReport(req: Request, res: Response) {
+    const { params, query } =
+      getValidatedRequest<GetReportRequest>(req);
 
-      const filters = {
-        startDate: req.query.startDate as string,
-        endDate: req.query.endDate as string,
-        projectId: req.query.projectId as string,
-        teamId: req.query.teamId as string,
-        userId: req.query.userId as string,
-      };
+    const report = await this.service.getReport(
+      req.user!.organizationId,
+      params.reportType,
+      query,
+    );
 
-      const report = await this.service.getReport(organizationId, reportType, filters);
-      res.status(200).json({ data: report });
-    } catch (error) {
-      next(error);
-    }
+    res.status(200).json({ data: report });
   }
 }
