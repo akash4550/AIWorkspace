@@ -3,8 +3,10 @@ import { Router } from 'express';
 import { TaskController } from './task.controller';
 import { canUpdateTask } from './task.permissions';
 import {
+  assignTaskSchema,
   createTaskSchema,
   moveTaskSchema,
+  taskIdSchema,
   updateTaskSchema,
 } from './task.validator';
 
@@ -29,6 +31,7 @@ router.get(
 router.get(
   '/:id',
   authorize(PERMISSIONS.TASK.READ),
+  validateRequest(taskIdSchema),
   asyncWrapper(controller.getTaskById)
 );
 
@@ -42,8 +45,8 @@ router.post(
 router.patch(
   '/:id',
   authorize(PERMISSIONS.TASK.UPDATE),
-  requireOwnership(canUpdateTask),
   validateRequest(updateTaskSchema),
+  requireOwnership(canUpdateTask),
   asyncWrapper(controller.updateTask)
 );
 
@@ -57,24 +60,28 @@ router.patch(
 router.patch(
   '/:id/assign',
   authorize(PERMISSIONS.TASK.ASSIGN),
+  validateRequest(assignTaskSchema),
   asyncWrapper(controller.assignTask)
 );
 
 router.patch(
   '/:id/archive',
   authorize(PERMISSIONS.TASK.ARCHIVE),
+  validateRequest(taskIdSchema),
   asyncWrapper(controller.archiveTask)
 );
 
 router.patch(
   '/:id/restore',
   authorize(PERMISSIONS.TASK.ARCHIVE),
+  validateRequest(taskIdSchema),
   asyncWrapper(controller.restoreTask)
 );
 
 router.delete(
   '/:id',
   authorize(PERMISSIONS.TASK.DELETE),
+  validateRequest(taskIdSchema),
   asyncWrapper(controller.deleteTask)
 );
 

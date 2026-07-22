@@ -1,12 +1,87 @@
 import { Prisma, TaskStatus } from '@prisma/client';
 import { prisma } from '../../config/prisma';
+import { AppError } from '../../core/errors/AppError';
 import {
   CreateTaskDto,
   UpdateTaskDto,
   TaskQueryDto,
 } from './task.dto';
 
+const taskReferenceNotFound = () =>
+  new AppError(
+    'One or more task references were not found',
+    404,
+  );
+
 export class TaskRepository {
+  private async assertTaskReferences(
+    transaction: Prisma.TransactionClient,
+    organizationId: string,
+    references: {
+      projectId: string;
+      parentTaskId?: string | null;
+      assigneeId?: string | null;
+    },
+  ): Promise<void> {
+    const [project, parentTask, assignee] =
+      await Promise.all([
+        transaction.project.findFirst({
+          where: {
+            id: references.projectId,
+            organizationId,
+            deletedAt: null,
+          },
+          select: {
+            id: true,
+          },
+        }),
+
+        references.parentTaskId
+          ? transaction.task.findFirst({
+              where: {
+                id: references.parentTaskId,
+                organizationId,
+                projectId: references.projectId,
+                deletedAt: null,
+              },
+              select: {
+                id: true,
+              },
+            })
+          : Promise.resolve(null),
+
+        references.assigneeId
+          ? transaction.user.findFirst({
+              where: {
+                id: references.assigneeId,
+                organizationId,
+                isActive: true,
+                deletedAt: null,
+              },
+              select: {
+                id: true,
+              },
+            })
+          : Promise.resolve(null),
+      ]);
+
+    const invalidParentTask =
+      references.parentTaskId != null &&
+      parentTask === null;
+
+    const invalidAssignee =
+      references.assigneeId != null &&
+      assignee === null;
+
+    if (
+      project === null ||
+      invalidParentTask ||
+      invalidAssignee
+    ) {
+      throw taskReferenceNotFound();
+    }
+  }
+
   async findById(organizationId: string, id: string) {
     return prisma.task.findFirst({
       where: {
@@ -157,11 +232,12 @@ export class TaskRepository {
   }
 
   async findMaxPosition(
+    transaction: Prisma.TransactionClient,
     organizationId: string,
     projectId: string,
     status: TaskStatus,
   ) {
-    const task = await prisma.task.findFirst({
+    const task = await transaction.task.findFirst({
       where: {
         organizationId,
         projectId,
@@ -184,33 +260,46 @@ export class TaskRepository {
     reporterId: string,
     data: CreateTaskDto,
   ) {
-    let position = data.position;
-
-    if (position === undefined) {
-      const maxPosition = await this.findMaxPosition(
+    return prisma.$transaction(async (transaction) => {
+      await this.assertTaskReferences(
+        transaction,
         organizationId,
-        data.projectId,
-        data.status ?? TaskStatus.TODO,
+        {
+          projectId: data.projectId,
+          parentTaskId: data.parentTaskId,
+          assigneeId: data.assigneeId,
+        },
       );
 
-      position = maxPosition + 65536;
-    }
+      let position = data.position;
 
-    return prisma.task.create({
-      data: {
-        organizationId,
-        reporterId,
-        projectId: data.projectId,
-        parentTaskId: data.parentTaskId,
-        title: data.title,
-        description: data.description,
-        status: data.status,
-        priority: data.priority,
-        assigneeId: data.assigneeId,
-        dueDate: data.dueDate,
-        estimatedHours: data.estimatedHours,
-        position,
-      },
+      if (position === undefined) {
+        const maxPosition = await this.findMaxPosition(
+          transaction,
+          organizationId,
+          data.projectId,
+          data.status ?? TaskStatus.TODO,
+        );
+
+        position = maxPosition + 65536;
+      }
+
+      return transaction.task.create({
+        data: {
+          organizationId,
+          reporterId,
+          projectId: data.projectId,
+          parentTaskId: data.parentTaskId,
+          title: data.title,
+          description: data.description,
+          status: data.status,
+          priority: data.priority,
+          assigneeId: data.assigneeId,
+          dueDate: data.dueDate,
+          estimatedHours: data.estimatedHours,
+          position,
+        },
+      });
     });
   }
 
@@ -219,23 +308,42 @@ export class TaskRepository {
     id: string,
     data: UpdateTaskDto,
   ) {
-    const existing = await prisma.task.findFirst({
-      where: {
-        id,
-        organizationId,
-        deletedAt: null,
-      },
-    });
+    return prisma.$transaction(async (transaction) => {
+      const existing = await transaction.task.findFirst({
+        where: {
+          id,
+          organizationId,
+          deletedAt: null,
+        },
+        select: {
+          id: true,
+          projectId: true,
+        },
+      });
 
-    if (!existing) {
-      return null;
-    }
+      if (!existing) {
+        return null;
+      }
 
-    return prisma.task.update({
-      where: {
-        id,
-      },
-      data,
+      if (data.assigneeId !== undefined) {
+        await this.assertTaskReferences(
+          transaction,
+          organizationId,
+          {
+            projectId: existing.projectId,
+            assigneeId: data.assigneeId,
+          },
+        );
+      }
+
+      return transaction.task.update({
+        where: {
+          id,
+          organizationId,
+          deletedAt: null,
+        },
+        data,
+      });
     });
   }
 
