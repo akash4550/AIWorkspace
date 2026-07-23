@@ -1,0 +1,39 @@
+name: aiworkspace-test
+
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: aiworkspace_test
+      POSTGRES_PASSWORD: aiworkspace_test
+      POSTGRES_DB: aiworkspace_test
+    ports:
+      - "127.0.0.1:55433:5432"
+    volumes:
+      - test_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U aiworkspace_test -d aiworkspace_test",
+        ]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "127.0.0.1:56379:6379"
+    volumes:
+      - test_redis_data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  test_postgres_data:
+  test_redis_data:
