@@ -24,11 +24,21 @@ jobs:
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
+      redis:
+        image: redis:7-alpine
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     env:
       NODE_ENV: test
       DATABASE_URL: postgresql://aiworkspace_test:aiworkspace_test@127.0.0.1:5432/aiworkspace_test
       DIRECT_DATABASE_URL: postgresql://aiworkspace_test:aiworkspace_test@127.0.0.1:5432/aiworkspace_test
       AUTH_TEST_DATABASE_URL: postgresql://aiworkspace_test:aiworkspace_test@127.0.0.1:5432/aiworkspace_test
+      REDIS_URL: redis://127.0.0.1:6379
       JWT_ACCESS_SECRET: ci-access-token-secret-change-me-now
       JWT_REFRESH_SECRET: ci-refresh-token-secret-change-me-now
       JWT_ISSUER: aiworkspace-api
@@ -51,7 +61,7 @@ jobs:
         run: npm run generate
 
       - name: Deploy committed database migrations
-        run: npm run migrate:deploy --workspace=api
+        run: npm run test:db:migrate
 
       - name: Type-check workspaces with their declared compilers
         run: npm run typecheck

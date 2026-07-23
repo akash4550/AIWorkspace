@@ -43,6 +43,27 @@ AIWorkspace is a comprehensive, production-ready enterprise platform demonstrati
    npm run dev
    ```
 
+## Deterministic Integration Tests
+
+The integration suite uses dedicated Docker services on PostgreSQL port `55433` and Redis port `56379`.
+
+```bash
+# Start services and apply committed migrations
+npm run test:infra:start
+
+# Reset clean Docker volumes and reapply all migrations
+npm run test:infra:reset
+
+# Start services, migrate, and run the complete API suite
+npm run test:integration
+
+# Inspect or stop the dedicated test services
+npm run test:infra:status
+npm run test:infra:stop
+```
+
+The guarded migration command rejects non-local hosts and databases other than `aiworkspace_test`. CI uses the same migration path through `npm run test:db:migrate`.
+
 ## 📖 Documentation
 - [Production & Deployment Guide](PRODUCTION.md)
 - [Architecture Decision Record: Modular Monolith](ADR-001-Modular-Monolith.md)
