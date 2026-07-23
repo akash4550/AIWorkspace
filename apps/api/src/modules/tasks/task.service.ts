@@ -158,18 +158,18 @@ export class TaskService {
   }
 
   async deleteTask(organizationId: string, taskId: string) {
-    const task = await this.repository.softDelete(
+    const result = await this.repository.softDelete(
       organizationId,
       taskId
     );
 
-    if (!task) {
+    if (result.count === 0) {
       throw new AppError('Task not found', 404);
     }
 
     // TODO:
     // EventBus.publish('task.deleted', { taskId });
 
-    return task;
+    return result;
   }
 }

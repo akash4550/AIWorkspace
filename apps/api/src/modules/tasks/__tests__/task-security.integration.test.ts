@@ -129,7 +129,7 @@ const tokenFor = (user: User): string => {
 };
 
 const sendRequest = async (
-  method: 'POST' | 'PATCH',
+  method: 'POST' | 'PATCH' | 'DELETE',
   path: string,
   actor: User,
   body: Record<string, unknown>,
@@ -734,6 +734,62 @@ describe('task tenant reference boundaries', () => {
 
       expect(unchangedTask.assigneeId).toBe(
         primaryAssignee.id,
+      );
+    },
+  );
+
+  test(
+    'returns 404 when deleting a missing task',
+    async () => {
+      const response = await sendRequest(
+        'DELETE',
+        `/api/v1/tasks/${randomUUID()}`,
+        primaryAdmin,
+        {},
+      );
+
+      expect(response.status).toBe(404);
+      expect(response.body?.error?.message).toBe(
+        'Task not found',
+      );
+    },
+  );
+  test(
+    'returns 404 when deleting an already-deleted task',
+    async () => {
+      const project = await createProject({
+        organizationId: primaryOrganizationId,
+        ownerId: primaryAdmin.id,
+        name: 'Already Deleted Task Project',
+      });
+
+      const task = await createTask({
+        organizationId: primaryOrganizationId,
+        projectId: project.id,
+        reporterId: primaryAdmin.id,
+        assigneeId: primaryAssignee.id,
+        title: 'Already Deleted Task',
+      });
+
+      await prisma.task.update({
+        where: {
+          id: task.id,
+        },
+        data: {
+          deletedAt: new Date(),
+        },
+      });
+
+      const response = await sendRequest(
+        'DELETE',
+        `/api/v1/tasks/${task.id}`,
+        primaryAdmin,
+        {},
+      );
+
+      expect(response.status).toBe(404);
+      expect(response.body?.error?.message).toBe(
+        'Task not found',
       );
     },
   );
