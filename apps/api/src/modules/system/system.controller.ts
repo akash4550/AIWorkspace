@@ -4,6 +4,7 @@ import { getRedisClient } from '../../core/redis/redis.client';
 import { logger } from '../../core/utils/logger';
 import { metricsRegistry } from '../../core/metrics/httpMetrics';
 import { collectQueueDepths } from '../../core/metrics/queueMetrics';
+import { observeDependencyCheck } from '../../core/metrics/dependencyMetrics';
 import { allQueues } from '../jobs/queues';
 export class SystemController {
   
@@ -23,11 +24,17 @@ export class SystemController {
   async checkReadiness(req: Request, res: Response) {
     try {
       // Check Postgres
-      await prisma.$queryRaw`SELECT 1`;
+      await observeDependencyCheck(
+  'postgres',
+  async () => prisma.$queryRaw`SELECT 1`,
+);
       
       // Check Redis
       const redis = getRedisClient();
-      await redis.ping();
+      await observeDependencyCheck(
+  'redis',
+  async () => redis.ping(),
+);
 
       res.status(200).json({
         status: 'ready',

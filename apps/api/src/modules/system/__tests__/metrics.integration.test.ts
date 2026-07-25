@@ -132,33 +132,55 @@ describe('protected metrics endpoint', () => {
   });
 
   it('returns Prometheus metrics to a super administrator', async () => {
-    const response = await requestMetrics(superAdmin);
-    const body = await response.text();
+  const readinessResponse = await fetch(
+    `${baseUrl}/api/v1/system/ready`,
+  );
 
-    expect(response.status).toBe(200);
+  expect(readinessResponse.status).toBe(200);
 
-    expect(response.headers.get('content-type')).toContain(
-      'text/plain',
-    );
+  const response = await requestMetrics(superAdmin);
+  const body = await response.text();
 
-    expect(body).toContain(
-      '# HELP aiworkspace_http_requests_total',
-    );
+  expect(response.status).toBe(200);
 
-    expect(body).toContain(
-      '# HELP aiworkspace_http_request_duration_seconds',
-    );
+  expect(response.headers.get('content-type')).toContain(
+    'text/plain',
+  );
 
-    expect(body).toContain(
-      'aiworkspace_process_cpu_user_seconds_total',
-    );
+  expect(body).toContain(
+    '# HELP aiworkspace_http_requests_total',
+  );
 
-    expect(body).toContain(
-  '# HELP aiworkspace_queue_depth',
-);
+  expect(body).toContain(
+    '# HELP aiworkspace_http_request_duration_seconds',
+  );
 
-expect(body).toContain(
-  'aiworkspace_queue_depth{queue="emailQueue",state="waiting"}',
-);
-  });
+  expect(body).toContain(
+    'aiworkspace_process_cpu_user_seconds_total',
+  );
+
+  expect(body).toContain(
+    '# HELP aiworkspace_queue_depth',
+  );
+
+  expect(body).toContain(
+    'aiworkspace_queue_depth{queue="emailQueue",state="waiting"}',
+  );
+
+  expect(body).toContain(
+    'aiworkspace_dependency_up{dependency="postgres"} 1',
+  );
+
+  expect(body).toContain(
+    'aiworkspace_dependency_up{dependency="redis"} 1',
+  );
+
+  expect(body).toContain(
+    'aiworkspace_dependency_check_duration_seconds_count{dependency="postgres",result="success"} 1',
+  );
+
+  expect(body).toContain(
+    'aiworkspace_dependency_check_duration_seconds_count{dependency="redis",result="success"} 1',
+  );
+});
 });
