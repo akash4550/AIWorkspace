@@ -1,4 +1,5 @@
 import { spawnSync } from 'node:child_process';
+import { existsSync } from 'node:fs';
 
 const composeFile = 'docker-compose.production.yml';
 const organizationId = process.env.SMOKE_AUTH_ORGANIZATION_ID
@@ -9,14 +10,26 @@ const email = process.env.SMOKE_AUTH_EMAIL || 'production-smoke@example.com';
 const password = process.env.SMOKE_AUTH_PASSWORD || 'SmokePassword123!';
 
 const runCompose = (args) => {
+  const composeArgs = ['compose'];
+
+  if (existsSync('.env.production')) {
+    composeArgs.push('--env-file', '.env.production');
+  }
+
+  composeArgs.push('-f', composeFile, ...args);
+
   const result = spawnSync(
     'docker',
-    ['compose', '-f', composeFile, ...args],
+    composeArgs,
     { encoding: 'utf8', env: process.env },
   );
 
   if (result.status !== 0) {
-    throw new Error(result.stderr || result.stdout || `Docker Compose failed: ${args.join(' ')}`);
+    throw new Error(
+      result.stderr
+      || result.stdout
+      || `Docker Compose failed: ${args.join(' ')}`,
+    );
   }
 };
 

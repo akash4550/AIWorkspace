@@ -2,10 +2,9 @@ import express, { Application, Request, Response } from 'express';
 import cors from 'cors';
 import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
-import morgan from 'morgan';
+
 import rateLimit from 'express-rate-limit';
 import { errorMiddleware } from './core/middlewares/errorMiddleware';
-import { logger } from './core/utils/logger';
 
 import organizationRoutes from './modules/organization/organization.routes';
 import userRoutes from './modules/user/user.routes';
@@ -32,14 +31,14 @@ import aiRoutes from './modules/ai/ai.routes';
 import searchRoutes from './modules/search/search.routes';
 import authRoutes from './modules/auth/auth.routes';
 import { env } from './config/env';
-
+import { requestObservability } from './core/middlewares/requestObservability';
 
 const app: Application = express();
 
 if (process.env.NODE_ENV === 'production') {
   app.set('trust proxy', 1);
 }
-
+app.use(requestObservability);
 // Security and utility middlewares
 app.use(helmet());
 
@@ -59,9 +58,7 @@ app.use(cors({
 }));
 app.use(cookieParser());
 app.use(express.json());
-app.use(morgan('combined', {
-    stream: { write: (message) => logger.info(message.trim()) }
-}));
+
 
 // Health check endpoint
 app.get('/health', (req: Request, res: Response) => {

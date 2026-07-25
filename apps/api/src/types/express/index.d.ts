@@ -11,6 +11,8 @@ declare global {
     interface Request {
       user?: UserPayload;
       validated?: unknown;
+      requestId: string;
+      requestStartedAt: number;
     }
   }
 }

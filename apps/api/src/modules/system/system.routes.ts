@@ -1,5 +1,8 @@
 import { Router } from 'express';
 import { SystemController } from './system.controller';
+import { Role } from '@prisma/client';
+import { requireAuth } from '../../core/middlewares/authMiddleware';
+import { requireRole } from '../../core/middlewares/rbacMiddleware';
 
 const router = Router();
 const controller = new SystemController();
@@ -21,6 +24,14 @@ router.get('/live', controller.checkLiveness.bind(controller));
  *     tags: [System]
  */
 router.get('/ready', controller.checkReadiness.bind(controller));
+
+// Prometheus metrics endpoint (Super Admin only)
+router.get(
+  '/metrics',
+  requireAuth,
+  requireRole(Role.SUPER_ADMIN),
+  controller.getMetrics.bind(controller)
+);
 
 // Alias for general health
 router.get('/health', controller.checkReadiness.bind(controller));
