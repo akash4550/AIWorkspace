@@ -1,29 +1,57 @@
 import winston from 'winston';
+
 import { env } from '../../config/env';
+import { redactSensitive } from './redactSensitive';
 
-const { combine, timestamp, json, printf, colorize, errors } = winston.format;
+const {
+  combine,
+  timestamp,
+  json,
+  printf,
+  colorize,
+} = winston.format;
 
-// Custom format for local development
+const redactFormat = winston.format((info) => {
+  const redacted = redactSensitive(info);
+
+  if (
+    typeof redacted === 'object'
+    && redacted !== null
+    && !Array.isArray(redacted)
+  ) {
+    Object.assign(info, redacted);
+  }
+
+  return info;
+})();
+
 const consoleFormat = combine(
   colorize(),
   timestamp({ format: 'YYYY-MM-DD HH:mm:ss' }),
-  printf(({ level, message, timestamp, stack }) => {
-    return `${timestamp} ${level}: ${stack || message}`;
-  })
+  printf(({ level, message, timestamp, stack, service, ...meta }) => {
+    const metaString = Object.keys(meta).length > 0
+      ? `\n${JSON.stringify(meta, null, 2)}`
+      : '';
+
+    return `${timestamp} ${level}: ${stack || message}${metaString}`;
+  }),
 );
 
 export const logger = winston.createLogger({
   level: env.NODE_ENV === 'production' ? 'info' : 'debug',
   format: combine(
-    errors({ stack: true }),
+    redactFormat,
     timestamp(),
-    json()
+    json(),
   ),
-  defaultMeta: { service: 'aiworkspace-api' },
+  defaultMeta: {
+    service: 'aiworkspace-api',
+  },
   transports: [
-    // In production, we only log to stdout in JSON format for Datadog/CloudWatch to ingest
     new winston.transports.Console({
-      format: env.NODE_ENV === 'production' ? json() : consoleFormat
-    })
-  ]
+      format: env.NODE_ENV === 'production'
+        ? json()
+        : consoleFormat,
+    }),
+  ],
 });

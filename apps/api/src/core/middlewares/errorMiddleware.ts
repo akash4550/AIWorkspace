@@ -5,6 +5,7 @@ import { JsonWebTokenError, TokenExpiredError } from 'jsonwebtoken';
 
 import { AppError } from '../errors/AppError';
 import { logger } from '../utils/logger';
+import {getNormalizedRoute} from '../utils/requestRoute';
 
 export const errorMiddleware = (
   err: any,
@@ -57,16 +58,29 @@ export const errorMiddleware = (
     }
   }
 
-  logger.error({
+  const route = getNormalizedRoute(req);
+
+  const logMeta = {
+    requestId: req.requestId,
     method: req.method,
-    url: req.originalUrl,
+    route,
     status,
-    message: err.message,
-    stack: err.stack,
-  });
+    message,
+  };
+
+  if (status < 500) {
+    logger.warn(logMeta);
+  } else {
+    logger.error({
+      ...logMeta,
+      errorName: err.name,
+      stack: err.stack,
+    });
+  }
 
   res.status(status).json({
     success: false,
+    requestId: req.requestId,
     error: {
       message,
 
