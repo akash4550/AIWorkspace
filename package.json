@@ -29,7 +29,12 @@
     "test:infra:stop": "node scripts/test-infrastructure.mjs stop",
     "test:infra:status": "node scripts/test-infrastructure.mjs status",
     "test:db:migrate": "node scripts/test-infrastructure.mjs migrate",
-    "test:integration": "node scripts/test-infrastructure.mjs test"
+    "test:integration": "node scripts/test-infrastructure.mjs test",
+    "backup:test": "node scripts/backup-recovery.mjs create-test",
+    "backup:production": "node scripts/backup-recovery.mjs create-production",
+    "backup:verify": "node scripts/backup-recovery.mjs verify",
+    "backup:drill": "node scripts/backup-recovery.mjs drill",
+    "backup:cleanup": "node scripts/backup-recovery.mjs cleanup"
   },
   "overrides": {
     "ioredis": "5.10.1",

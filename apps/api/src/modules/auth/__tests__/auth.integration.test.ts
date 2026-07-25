@@ -8,7 +8,7 @@ import { Role } from '@prisma/client';
 import app from '../../../app';
 import { env } from '../../../config/env';
 import { prisma } from '../../../config/prisma';
-import { getRedisClient } from '../../../core/redis/redis.client';
+import { closeRedisClient, getRedisClient } from '../../../core/redis/redis.client';
 import { allQueues } from '../../jobs/queues';
 import {
   REFRESH_COOKIE_NAME,
@@ -201,6 +201,9 @@ beforeAll(async () => {
 
 beforeEach(async () => {
   await prisma.refreshToken.deleteMany();
+  await prisma.document.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.project.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
 
@@ -228,6 +231,9 @@ beforeEach(async () => {
 
 afterAll(async () => {
   await prisma.refreshToken.deleteMany();
+  await prisma.document.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.project.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
   await new Promise<void>((resolve, reject) => {
@@ -235,7 +241,7 @@ afterAll(async () => {
     server.closeAllConnections();
   });
   await Promise.all(allQueues.map((queue) => queue.close()));
-  await getRedisClient().quit();
+  await closeRedisClient();
   await prisma.$disconnect();
 });
 

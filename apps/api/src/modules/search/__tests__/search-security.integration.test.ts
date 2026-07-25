@@ -13,7 +13,7 @@ import {
 
 import app from '../../../app';
 import { prisma } from '../../../config/prisma';
-import { getRedisClient } from '../../../core/redis/redis.client';
+import { closeRedisClient, getRedisClient } from '../../../core/redis/redis.client';
 import { signAccessToken } from '../../../core/security/jwt';
 import { allQueues } from '../../jobs/queues';
 
@@ -402,7 +402,7 @@ afterAll(async () => {
     allQueues.map((queue) => queue.close()),
   );
 
-  await getRedisClient().quit();
+  await closeRedisClient();
   await prisma.$disconnect();
 });
 
