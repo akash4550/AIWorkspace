@@ -11,7 +11,7 @@ import {
 
 import app from '../../../app';
 import { prisma } from '../../../config/prisma';
-import { getRedisClient } from '../../../core/redis/redis.client';
+import { closeRedisClient, getRedisClient } from '../../../core/redis/redis.client';
 import { signAccessToken } from '../../../core/security/jwt';
 import { allQueues } from '../../jobs/queues';
 import { UserRepository } from '../user.repository';
@@ -119,6 +119,9 @@ beforeAll(async () => {
 beforeEach(async () => {
   await prisma.activityLog.deleteMany();
   await prisma.refreshToken.deleteMany();
+  await prisma.document.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.project.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
 
@@ -158,6 +161,9 @@ beforeEach(async () => {
 afterAll(async () => {
   await prisma.activityLog.deleteMany();
   await prisma.refreshToken.deleteMany();
+  await prisma.document.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.project.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
   await new Promise<void>((resolve, reject) => {
@@ -165,7 +171,7 @@ afterAll(async () => {
     server.closeAllConnections();
   });
   await Promise.all(allQueues.map((queue) => queue.close()));
-  await getRedisClient().quit();
+  await closeRedisClient();
   await prisma.$disconnect();
 });
 

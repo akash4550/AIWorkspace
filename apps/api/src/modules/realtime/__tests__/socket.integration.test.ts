@@ -103,6 +103,9 @@ beforeAll(async () => {
 beforeEach(async () => {
   getIO().disconnectSockets(true);
   await prisma.refreshToken.deleteMany();
+  await prisma.document.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.project.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
 
@@ -130,6 +133,9 @@ afterAll(async () => {
   getIO().disconnectSockets(true);
   await new Promise<void>((resolve) => getIO().close(() => resolve()));
   await prisma.refreshToken.deleteMany();
+  await prisma.document.deleteMany();
+  await prisma.task.deleteMany();
+  await prisma.project.deleteMany();
   await prisma.user.deleteMany();
   await prisma.organization.deleteMany();
   await prisma.$disconnect();
