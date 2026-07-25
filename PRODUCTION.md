@@ -327,6 +327,112 @@ docker compose \
 
 Application logs are written to standard output. Production infrastructure should collect container logs into a durable centralized logging system.
 
+### 9.1 Protected Metrics Endpoint
+
+Prometheus-format application metrics are available at:
+
+~~~text
+GET /api/v1/system/metrics
+~~~
+
+The endpoint requires a valid `SUPER_ADMIN` access token. It must not be
+published as an anonymous public endpoint.
+
+Example verification:
+
+~~~bash
+curl --fail --silent --show-error \
+  --header "Authorization: Bearer ${SUPER_ADMIN_ACCESS_TOKEN}" \
+  "http://127.0.0.1:${WEB_PORT:-80}/api/v1/system/metrics"
+~~~
+
+A production metrics collector should use a dedicated protected credential and
+store it in the platform secret manager. Do not place access tokens in source
+control, shell history, dashboards, or alert descriptions.
+
+The metrics baseline includes:
+
+- HTTP request count, server-error count, and request-duration histograms
+- BullMQ waiting, active, delayed, and failed queue depths
+- BullMQ completed-job and failed-job counters
+- PostgreSQL and Redis availability and check-duration histograms
+- Node.js process and runtime metrics
+
+### 9.2 Initial Alert Thresholds
+
+These are initial operational thresholds. Review and tune them after enough
+production traffic has been observed to establish normal baselines.
+
+| Alert | Initial threshold | Evaluation period | Severity |
+| --- | --- | --- | --- |
+| API server-error rate | More than 5% of requests return `5xx` | 5 minutes | Critical |
+| API latency | HTTP p95 exceeds 1 second | 10 minutes | Warning |
+| Dependency unavailable | PostgreSQL or Redis availability is `0` | 2 minutes | Critical |
+| Queue backlog | Waiting jobs exceed 100 for any queue | 10 minutes | Warning |
+| Queue failures | More than 5 failed jobs in any queue | 10 minutes | Warning |
+| Readiness failure | Readiness returns a non-`200` response | 2 consecutive checks | Critical |
+| Container restart loop | A critical container restarts more than 3 times | 10 minutes | Critical |
+
+Example PromQL expressions:
+
+~~~promql
+sum(rate(aiworkspace_http_request_errors_total[5m]))
+/
+clamp_min(sum(rate(aiworkspace_http_requests_total[5m])), 0.001)
+> 0.05
+~~~
+
+~~~promql
+histogram_quantile(
+  0.95,
+  sum by (le) (
+    rate(aiworkspace_http_request_duration_seconds_bucket[5m])
+  )
+) > 1
+~~~
+
+~~~promql
+min by (dependency) (
+  aiworkspace_dependency_up
+) == 0
+~~~
+
+~~~promql
+max by (queue) (
+  aiworkspace_queue_depth{state="waiting"}
+) > 100
+~~~
+
+~~~promql
+sum by (queue) (
+  increase(aiworkspace_queue_jobs_failed_total[10m])
+) > 5
+~~~
+
+### 9.3 Alert Investigation Procedure
+
+1. Record the alert start time, affected route, queue, dependency, and metric
+   labels before changing the system.
+2. Check `/api/v1/system/live` and `/api/v1/system/ready` to distinguish an
+   application failure from a PostgreSQL or Redis dependency failure.
+3. Retrieve the protected metrics output and compare current request rate,
+   error rate, latency, dependency state, and queue depth.
+4. Search centralized API logs for the affected route and status. Use the
+   request correlation ID to follow one request across warnings, errors, and
+   completion logs.
+5. For PostgreSQL failures, inspect API and PostgreSQL logs, connection limits,
+   disk availability, migrations, and network access.
+6. For Redis failures, inspect API and Redis logs, memory pressure, persistence
+   errors, network access, and process health.
+7. For queue backlogs, compare waiting, active, delayed, and failed counts.
+   Confirm the expected workers are running and inspect worker errors.
+8. Preserve failed-job data and relevant logs before retrying, deleting, or
+   draining jobs.
+9. Apply the smallest safe mitigation, verify readiness and metrics recovery,
+   and monitor through at least one complete alert evaluation period.
+10. Record the root cause, mitigation, customer impact, correlation IDs, and
+    follow-up actions in the incident record.
+
 ## 10. Database Backups
 
 The repository provides a guarded backup runner. PostgreSQL commands execute
