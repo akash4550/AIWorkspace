@@ -11,7 +11,7 @@ const password = process.env.SMOKE_AUTH_PASSWORD || 'SmokePassword123!';
 const runCompose = (args) => {
   const result = spawnSync(
     'docker',
-    ['compose', '-f', composeFile, ...args],
+    ['compose', '--env-file', '.env.production', '-f', composeFile, ...args],
     { encoding: 'utf8', env: process.env },
   );
 
