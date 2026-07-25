@@ -2,7 +2,7 @@ import { Request, Response } from 'express';
 import { prisma } from '../../config/prisma';
 import { getRedisClient } from '../../core/redis/redis.client';
 import { logger } from '../../core/utils/logger';
-
+import { metricsRegistry } from '../../core/metrics/httpMetrics';
 export class SystemController {
   
   /**
@@ -41,5 +41,10 @@ export class SystemController {
         timestamp: new Date().toISOString()
       });
     }
+  }
+  async getMetrics(req: Request, res: Response) {
+    res.set('Content-Type', metricsRegistry.contentType);
+    const metrics = await metricsRegistry.metrics();
+    res.status(200).send(metrics);
   }
 }
