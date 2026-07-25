@@ -329,57 +329,83 @@ Application logs are written to standard output. Production infrastructure shoul
 
 ## 10. Database Backups
 
-Load the production environment into the shell:
+The repository provides a guarded backup runner. PostgreSQL commands execute
+inside the database container, so database credentials are not printed or
+copied into the host shell.
+
+The production PostgreSQL service must already be running, and the local
+`.env.production` file must exist.
+
+Create a timestamped custom-format production backup:
 
 ```bash
-set -a
-. ./.env.production
-set +a
+npm run backup:production
 ```
 
-Create a backup directory:
+A successful command creates two ignored files under `backups/`:
+
+- `aiworkspace-production-<UTC_TIMESTAMP>.dump`
+- `aiworkspace-production-<UTC_TIMESTAMP>.dump.manifest.json`
+
+The manifest records the backup size, SHA-256 hash, source type, applied
+migration count, and representative table row counts.
+
+Verify a selected backup through a real isolated restore:
 
 ```bash
-mkdir -p backups
-chmod 700 backups
+npm run backup:verify -- backups/aiworkspace-production-<UTC_TIMESTAMP>.dump
 ```
 
-Create a PostgreSQL custom-format backup:
+Verification checks the hash, recreates a fresh disposable database on
+`127.0.0.1:55434`, restores the archive, applies committed Prisma migrations,
+and compares the restored counts with the manifest.
+
+The workflow refuses restore targets other than the dedicated verification
+database. It never restores over the source or production database.
+
+Remove the disposable verification database:
 
 ```bash
-BACKUP_FILE="backups/aiworkspace-$(date -u +%Y%m%dT%H%M%SZ).dump"
-
-docker compose \
-  --env-file .env.production \
-  -f docker-compose.production.yml \
-  exec -T postgres \
-  pg_dump \
-    --username "$DB_USER" \
-    --dbname "$DB_NAME" \
-    --format custom \
-  > "$BACKUP_FILE"
+npm run backup:cleanup
 ```
 
-Validate that the backup can be read:
+Run the complete deterministic local recovery drill:
 
 ```bash
-cat "$BACKUP_FILE" |
-  docker compose \
-    --env-file .env.production \
-    -f docker-compose.production.yml \
-    exec -T postgres \
-    pg_restore --list >/dev/null
+npm run backup:drill
 ```
 
-Copy backups to storage outside the deployment host. A backup stored only on the same host is not sufficient disaster recovery.
+Copy every accepted production backup and its matching manifest to encrypted,
+access-controlled storage outside the deployment host. A backup stored only on
+the application host is not sufficient disaster recovery.
 
-Use managed PostgreSQL point-in-time recovery when available.
+Use managed PostgreSQL point-in-time recovery in addition to logical backups
+when available. Define retention periods and monitor backup storage capacity.
+
+If backup creation or verification fails:
+
+1. Do not deploy database migrations.
+2. Do not edit the manifest or reuse an archive with a hash mismatch.
+3. Preserve the failing archive and logs.
+4. Check Docker health, disk capacity, and PostgreSQL logs.
+5. Create a fresh backup and repeat the isolated verification drill.
 
 ## 11. Database Restore
 
-A restore is destructive. Test the procedure in a non-production environment before relying on it.
+A production restore is destructive and requires an approved recovery
+incident. No automated command in this repository restores over production.
+The `backup:verify` command is intentionally restricted to the isolated local
+verification database.
 
-Stop application traffic and background processing:
+Before restoring production:
+
+1. Verify the selected archive with `npm run backup:verify`.
+2. Confirm the required recovery point and matching application revision.
+3. Record the approval and expected data-loss window.
+4. Stop incoming traffic and background processing.
+5. Preserve a final backup of the current database when it remains readable.
+
+Stop the application services:
 
 ```bash
 docker compose \
@@ -388,38 +414,23 @@ docker compose \
   stop api web
 ```
 
-Recreate the database:
+Production database recreation and restoration must be performed manually by
+an authorized operator using the hosting provider's recovery controls or
+approved PostgreSQL administration tools.
 
-```bash
-docker compose \
-  --env-file .env.production \
-  -f docker-compose.production.yml \
-  exec -T postgres \
-  dropdb --username "$DB_USER" --if-exists "$DB_NAME"
+Never modify the verification runner to target the source or production
+database. Never bypass its host, port, username, or database-name safeguards.
 
-docker compose \
-  --env-file .env.production \
-  -f docker-compose.production.yml \
-  exec -T postgres \
-  createdb --username "$DB_USER" "$DB_NAME"
-```
+After restoration:
 
-Restore the selected backup:
+1. Deploy the application revision compatible with the selected backup.
+2. Apply the normal committed migration workflow.
+3. Start the application services.
+4. Verify database connectivity, readiness, authentication, and representative
+   records before reopening traffic.
+5. Retain the incident logs, backup, manifest, and verification evidence.
 
-```bash
-cat backups/SELECTED_BACKUP.dump |
-  docker compose \
-    --env-file .env.production \
-    -f docker-compose.production.yml \
-    exec -T postgres \
-    pg_restore \
-      --username "$DB_USER" \
-      --dbname "$DB_NAME" \
-      --no-owner \
-      --no-privileges
-```
-
-Start the application and verify readiness:
+Start the application after those checks are complete:
 
 ```bash
 docker compose \
@@ -427,7 +438,6 @@ docker compose \
   -f docker-compose.production.yml \
   up -d --no-build --wait api web
 ```
-
 ## 12. Rollback Policy
 
 Prisma migrations are forward-only in the automated deployment path.
