@@ -152,5 +152,13 @@ describe('protected metrics endpoint', () => {
     expect(body).toContain(
       'aiworkspace_process_cpu_user_seconds_total',
     );
+
+    expect(body).toContain(
+  '# HELP aiworkspace_queue_depth',
+);
+
+expect(body).toContain(
+  'aiworkspace_queue_depth{queue="emailQueue",state="waiting"}',
+);
   });
 });

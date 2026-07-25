@@ -1,6 +1,10 @@
 import { Worker } from 'bullmq';
 import { getRedisClient } from '../../../core/redis/redis.client';
 import { QUEUE_NAMES } from '../queues';
+import {
+  recordQueueJobCompleted,
+  recordQueueJobFailed,
+} from '../../../core/metrics/queueMetrics';
 
 // Processors
 import { emailProcessor } from '../processors/email.processor';
@@ -28,10 +32,12 @@ export const startWorkers = () => {
 
   workers.forEach(worker => {
     worker.on('completed', job => {
+      recordQueueJobCompleted(worker.name);
       console.log(`Job ${job.id} of type ${job.name} completed successfully.`);
     });
 
     worker.on('failed', (job, err) => {
+      recordQueueJobFailed(worker.name);
       console.error(`Job ${job?.id} of type ${job?.name} failed with error: ${err.message}`);
     });
   });

@@ -3,6 +3,8 @@ import { prisma } from '../../config/prisma';
 import { getRedisClient } from '../../core/redis/redis.client';
 import { logger } from '../../core/utils/logger';
 import { metricsRegistry } from '../../core/metrics/httpMetrics';
+import { collectQueueDepths } from '../../core/metrics/queueMetrics';
+import { allQueues } from '../jobs/queues';
 export class SystemController {
   
   /**
@@ -42,9 +44,10 @@ export class SystemController {
       });
     }
   }
-  async getMetrics(req: Request, res: Response) {
-    res.set('Content-Type', metricsRegistry.contentType);
-    const metrics = await metricsRegistry.metrics();
-    res.status(200).send(metrics);
-  }
+async getMetrics(req: Request, res: Response) {
+  res.set('Content-Type', metricsRegistry.contentType);
+  await collectQueueDepths(allQueues);
+  const metrics = await metricsRegistry.metrics();
+  res.status(200).send(metrics);
+}
 }
