@@ -1,7 +1,7 @@
 import {
   AIProvider as PrismaAIProvider,
 } from '@prisma/client';
-
+import { AIProviderError } from '../providers/ai-provider.error';
 import { prisma } from '../../../config/prisma';
 import { AppError } from '../../../core/errors/AppError';
 import {
@@ -9,13 +9,12 @@ import {
   AICompletionResponse,
   AIProvider,
 } from '../providers/ai-provider.interface';
-import { MockAIProvider } from '../providers/mock.provider';
-
+import { createAIProvider } from '../providers/ai-provider.factory';
 export class AIService {
   private readonly provider: AIProvider;
 
   constructor(
-    provider: AIProvider = new MockAIProvider(),
+    provider: AIProvider = createAIProvider(),
   ) {
     this.provider = provider;
   }
@@ -75,11 +74,18 @@ export class AIService {
         await this.provider.generateCompletion(
           normalizedRequest,
         );
-    } catch (error: unknown) {
-      const message =
-        error instanceof Error
-          ? error.message
-          : 'Unknown AI provider error';
+        } catch (error: unknown) {
+      const safeError =
+        error instanceof AIProviderError
+          ? error
+          : new AIProviderError(
+              'AI provider request failed',
+              {
+                provider: this.provider.name,
+                model: 'unknown',
+                statusCode: 502,
+              },
+            );
 
       await this.logUsage({
         organizationId,
@@ -89,12 +95,13 @@ export class AIService {
         success: false,
         latencyMs: Date.now() - startedAt,
         response: null,
-        errorMessage: message,
+        errorMessage: safeError.message,
+        model: safeError.model,
+        requestId: safeError.requestId,
       });
 
-      throw error;
+      throw safeError;
     }
-
     await this.logUsage({
       organizationId,
       userId,
@@ -136,6 +143,8 @@ export class AIService {
     latencyMs,
     response,
     errorMessage,
+    model,
+    requestId,
   }: {
     organizationId: string;
     userId: string;
@@ -145,6 +154,8 @@ export class AIService {
     latencyMs: number;
     response: AICompletionResponse | null;
     errorMessage?: string;
+    model?: string;
+    requestId?: string;
   }): Promise<void> {
     await prisma.aIUsageLog.create({
       data: {
@@ -152,7 +163,8 @@ export class AIService {
         userId,
         feature,
         provider,
-        model: response?.model ?? 'unknown',
+        model: response?.model ?? model ?? 'unknown',
+        requestId,
         promptTokens:
           response?.usage.promptTokens ?? 0,
         completionTokens:

@@ -1,4 +1,5 @@
 import { Request, Response } from 'express';
+import { env } from '../../config/env';
 import { prisma } from '../../config/prisma';
 import { getRedisClient } from '../../core/redis/redis.client';
 import { logger } from '../../core/utils/logger';
@@ -40,6 +41,17 @@ export class SystemController {
         status: 'ready',
         database: 'connected',
         redis: 'connected',
+               ai: {
+          provider: env.AI_PROVIDER,
+          model:
+            env.AI_MODEL ??
+            (env.AI_PROVIDER === 'MOCK'
+              ? 'mock-model-v1'
+              : 'unconfigured'),
+          configured:
+            env.AI_PROVIDER === 'MOCK' ||
+            Boolean(env.AI_MODEL && env.OPENAI_API_KEY),
+        },
         timestamp: new Date().toISOString()
       });
     } catch (error: any) {

@@ -18,13 +18,14 @@ describe('redactSensitive', () => {
   });
 
   it('matches keys case-insensitively', () => {
-    const input = {
-      PassWord: '123',
-      APIKEY: '456',
-      Authorization: 'Bearer xyz',
-      Set_Cookie: 'session=abc',
-      SECRET_KEY: 'hidden',
-    };
+  const input = {
+    PassWord: '123',
+    APIKEY: '456',
+    Authorization: 'Bearer xyz',
+    Set_Cookie: 'session=abc',
+    SECRET_KEY: 'hidden',
+    OPENAI_API_KEY: 'openai-secret',
+  };
 
     expect(redactSensitive(input)).toEqual({
       PassWord: '[REDACTED]',
@@ -32,6 +33,7 @@ describe('redactSensitive', () => {
       Authorization: '[REDACTED]',
       Set_Cookie: '[REDACTED]',
       SECRET_KEY: '[REDACTED]',
+      OPENAI_API_KEY: '[REDACTED]',
     });
   });
 

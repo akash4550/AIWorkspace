@@ -2,7 +2,7 @@ const REDACTED_VALUE = '[REDACTED]';
 const CIRCULAR_VALUE = '[CIRCULAR]';
 
 const SENSITIVE_KEYS_PATTERN =
-  /password|token|secret|authorization|cookie|apikey|credential|databaseurl|redisurl|connectionstring/i;
+  /password|token|secret|authorization|cookie|api[_-]?key|credential|databaseurl|redisurl|connectionstring/i;
 
 function isPlainObject(
   value: unknown,

@@ -20,6 +20,12 @@ const envSchema = z.object({
     .string()
     .url()
     .default('redis://localhost:6379'),
+
+  AI_PROVIDER: z.enum(['MOCK', 'OPENAI']).default('MOCK'),
+  AI_MODEL: z.string().trim().min(1).optional(),
+  OPENAI_API_KEY: z.string().trim().min(1).optional(),
+  AI_TIMEOUT_MS: z.coerce.number().int().positive().default(30000),
+  AI_MAX_OUTPUT_TOKENS: z.coerce.number().int().positive().default(1000),
 }).superRefine((env, ctx) => {
   if (env.JWT_ACCESS_AUDIENCE === env.JWT_REFRESH_AUDIENCE) {
     ctx.addIssue({
@@ -75,6 +81,29 @@ const envSchema = z.object({
         code: z.ZodIssueCode.custom,
         path: ['JWT_REFRESH_SECRET'],
         message: 'Access and refresh token secrets must be different',
+      });
+    }
+if (env.AI_PROVIDER !== 'OPENAI') {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AI_PROVIDER'],
+        message: 'AI_PROVIDER must be OPENAI in production',
+      });
+    }
+
+    if (!env.AI_MODEL) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['AI_MODEL'],
+        message: 'AI_MODEL is required in production',
+      });
+    }
+
+    if (!env.OPENAI_API_KEY) {
+      ctx.addIssue({
+        code: z.ZodIssueCode.custom,
+        path: ['OPENAI_API_KEY'],
+        message: 'OPENAI_API_KEY is required in production',
       });
     }
   }
