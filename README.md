@@ -69,6 +69,7 @@ The guarded migration command rejects non-local hosts and databases other than `
 - [Architecture Decision Record: Modular Monolith](ADR-001-Modular-Monolith.md)
 - [Architecture Deep Dive](docs/architecture.md)
 - [Local Development Setup](docs/local-development.md)
+- [Dependency Security Audit](docs/dependency-security-audit.md)
 
 ## 🔒 Security & Performance
 - Rate limiting globally applied to prevent DoS.
