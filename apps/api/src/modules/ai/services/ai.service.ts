@@ -9,13 +9,13 @@ import {
   AICompletionResponse,
   AIProvider,
 } from '../providers/ai-provider.interface';
-import { MockAIProvider } from '../providers/mock.provider';
+import { createAIProvider } from '../providers/ai-provider.factory';
 
 export class AIService {
   private readonly provider: AIProvider;
 
   constructor(
-    provider: AIProvider = new MockAIProvider(),
+    provider: AIProvider = createAIProvider(),
   ) {
     this.provider = provider;
   }
