@@ -1,10 +1,10 @@
 import OpenAI from 'openai';
-
 import {
   AICompletionRequest,
   AICompletionResponse,
   AIProvider,
 } from './ai-provider.interface';
+import { AIProviderError } from './ai-provider.error';
 
 export interface OpenAIProviderOptions {
   apiKey: string;
@@ -49,15 +49,21 @@ export class OpenAIProvider implements AIProvider {
       content: request.prompt,
     });
 
-    const completion = await this.client.chat.completions.create({
-      model: this.model,
-      messages,
-      max_completion_tokens:
-        request.maxTokens ?? this.maxOutputTokens,
-      temperature: request.temperature,
-      stop: request.stopSequences,
-      store: false,
-    });
+    let completion: OpenAI.Chat.Completions.ChatCompletion;
+
+    try {
+  completion = await this.client.chat.completions.create({
+    model: this.model,
+    messages,
+    max_completion_tokens:
+      request.maxTokens ?? this.maxOutputTokens,
+    temperature: request.temperature,
+    stop: request.stopSequences,
+    store: false,
+  });
+} catch (error: unknown) {
+  throw this.normalizeError(error);
+}
 
     return {
       text: completion.choices[0]?.message.content ?? '',
@@ -69,5 +75,65 @@ export class OpenAIProvider implements AIProvider {
       provider: this.name,
       model: completion.model,
     };
+  }
+    private normalizeError(error: unknown): AIProviderError {
+    if (error instanceof OpenAI.APIConnectionTimeoutError) {
+      return new AIProviderError(
+        'AI provider request timed out',
+        {
+          provider: this.name,
+          model: this.model,
+          statusCode: 504,
+          providerCode: 'timeout',
+        },
+      );
+    }
+
+    if (error instanceof OpenAI.RateLimitError) {
+      return new AIProviderError(
+        'AI provider rate limit exceeded',
+        {
+          provider: this.name,
+          model: this.model,
+          statusCode: 429,
+          requestId: error.requestID ?? undefined,
+          providerCode: error.code ?? 'rate_limit',
+        },
+      );
+    }
+
+    if (error instanceof OpenAI.APIConnectionError) {
+      return new AIProviderError(
+        'AI provider is temporarily unavailable',
+        {
+          provider: this.name,
+          model: this.model,
+          statusCode: 503,
+          providerCode: 'connection_error',
+        },
+      );
+    }
+
+    if (error instanceof OpenAI.APIError) {
+      return new AIProviderError(
+        'AI provider request failed',
+        {
+          provider: this.name,
+          model: this.model,
+          statusCode: 502,
+          requestId: error.requestID ?? undefined,
+          providerCode: error.code ?? undefined,
+        },
+      );
+    }
+
+    return new AIProviderError(
+      'AI provider request failed',
+      {
+        provider: this.name,
+        model: this.model,
+        statusCode: 502,
+      },
+    );
   }
 }

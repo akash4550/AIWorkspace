@@ -1,7 +1,7 @@
 import {
   AIProvider as PrismaAIProvider,
 } from '@prisma/client';
-
+import { AIProviderError } from '../providers/ai-provider.error';
 import { prisma } from '../../../config/prisma';
 import {
   AICompletionResponse,
@@ -137,7 +137,11 @@ describe('AIService', () => {
           prompt: 'Question',
         },
       ),
-    ).rejects.toBe(providerError);
+    ).rejects.toMatchObject({
+  name: 'AIProviderError',
+  message: 'AI provider request failed',
+  statusCode: 502,
+});
 
     expect(usageCreateMock).toHaveBeenCalledWith({
       data: {
@@ -151,7 +155,53 @@ describe('AIService', () => {
         totalTokens: 0,
         latencyMs: expect.any(Number),
         success: false,
-        errorMessage: 'Provider unavailable',
+        errorMessage: 'AI provider request failed',
+      },
+    });
+  });
+  it('logs safe provider metadata on failures', async () => {
+    const providerError = new AIProviderError(
+      'AI provider rate limit exceeded',
+      {
+        provider: 'mock',
+        model: 'provider-model-v1',
+        statusCode: 429,
+        requestId: 'provider-request-123',
+        providerCode: 'rate_limit',
+      },
+    );
+
+    providerMock.generateCompletion.mockRejectedValue(
+      providerError,
+    );
+    usageCreateMock.mockResolvedValue({});
+
+    await expect(
+      service.generateCompletion(
+        'organization-1',
+        'user-1',
+        'WORKSPACE_ASSISTANT',
+        {
+          prompt: 'Question',
+        },
+      ),
+    ).rejects.toBe(providerError);
+
+    expect(usageCreateMock).toHaveBeenCalledWith({
+      data: {
+        organizationId: 'organization-1',
+        userId: 'user-1',
+        feature: 'WORKSPACE_ASSISTANT',
+        provider: PrismaAIProvider.MOCK,
+        model: 'provider-model-v1',
+        requestId: 'provider-request-123',
+        promptTokens: 0,
+        completionTokens: 0,
+        totalTokens: 0,
+        latencyMs: expect.any(Number),
+        success: false,
+        errorMessage:
+          'AI provider rate limit exceeded',
       },
     });
   });

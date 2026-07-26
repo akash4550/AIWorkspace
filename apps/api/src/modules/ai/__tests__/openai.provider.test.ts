@@ -1,20 +1,37 @@
 import OpenAI from 'openai';
 
 import { OpenAIProvider } from '../providers/openai.provider';
+import { beforeEach } from 'node:test';
 
 const mockCreate = jest.fn();
 
-jest.mock('openai', () => ({
-  __esModule: true,
-  default: jest.fn().mockImplementation(() => ({
+jest.mock('openai', () => {
+  const actual = jest.requireActual('openai');
+  const ActualOpenAI = actual.default;
+
+  const MockOpenAI = jest.fn().mockImplementation(() => ({
     chat: {
       completions: {
         create: (...args: unknown[]) =>
           mockCreate(...args),
       },
     },
-  })),
-}));
+  }));
+
+  Object.assign(MockOpenAI, {
+    APIError: ActualOpenAI.APIError,
+    APIConnectionError: ActualOpenAI.APIConnectionError,
+    APIConnectionTimeoutError:
+      ActualOpenAI.APIConnectionTimeoutError,
+    RateLimitError: ActualOpenAI.RateLimitError,
+  });
+
+  return {
+    __esModule: true,
+    ...actual,
+    default: MockOpenAI,
+  };
+});
 
 describe('OpenAIProvider', () => {
   beforeEach(() => {
@@ -131,6 +148,57 @@ describe('OpenAIProvider', () => {
       },
       provider: 'openai',
       model: 'returned-openai-model',
+    });
+  });
+  it('normalizes timeout errors safely', async () => {
+    const timeoutError = Object.create(
+      OpenAI.APIConnectionTimeoutError.prototype,
+    );
+
+    mockCreate.mockRejectedValue(timeoutError);
+
+    const provider = new OpenAIProvider({
+      apiKey: 'test-openai-key',
+      model: 'configured-openai-model',
+      timeoutMs: 5000,
+      maxOutputTokens: 100,
+    });
+
+    await expect(
+      provider.generateCompletion({
+        prompt: 'Hello',
+      }),
+    ).rejects.toMatchObject({
+      name: 'AIProviderError',
+      message: 'AI provider request timed out',
+      statusCode: 504,
+      provider: 'openai',
+      model: 'configured-openai-model',
+      providerCode: 'timeout',
+    });
+  });
+  it('normalizes unknown errors safely', async () => {
+    mockCreate.mockRejectedValue(
+      new Error('Sensitive raw provider details'),
+    );
+
+    const provider = new OpenAIProvider({
+      apiKey: 'test-openai-key',
+      model: 'configured-openai-model',
+      timeoutMs: 5000,
+      maxOutputTokens: 100,
+    });
+
+    await expect(
+      provider.generateCompletion({
+        prompt: 'Hello',
+      }),
+    ).rejects.toMatchObject({
+      name: 'AIProviderError',
+      message: 'AI provider request failed',
+      statusCode: 502,
+      provider: 'openai',
+      model: 'configured-openai-model',
     });
   });
 });
