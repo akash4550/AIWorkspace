@@ -18,3 +18,4 @@ process.env.JWT_ISSUER = 'aiworkspace-api-test';
 process.env.JWT_ACCESS_AUDIENCE = 'aiworkspace-api-test';
 process.env.JWT_REFRESH_AUDIENCE = 'aiworkspace-auth-test';
 process.env.FRONTEND_URL = 'http://localhost:5173';
+process.env.AI_PROVIDER = 'MOCK';
