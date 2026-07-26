@@ -6,6 +6,8 @@ import path from 'node:path';
 const webUrl = new URL(process.env.SMOKE_WEB_URL || 'http://127.0.0.1:8080');
 const timeoutMs = Number(process.env.SMOKE_TIMEOUT_MS || 120_000);
 const retryIntervalMs = 2_000;
+const expectedAIProvider = process.env.AI_PROVIDER || 'OPENAI';
+const expectedAIModel = process.env.AI_MODEL || 'ci-openai-model';
 const smokeOrganizationId = process.env.SMOKE_AUTH_ORGANIZATION_ID
   || '11111111-1111-4111-8111-111111111111';
 const smokeEmail = process.env.SMOKE_AUTH_EMAIL || 'production-smoke@example.com';
@@ -264,16 +266,19 @@ console.log('PASS production browser bundle has no localhost API dependency');
 await fetchUntilReady(new URL('/api/v1/system/ready', webUrl), (body) => {
   const payload = JSON.parse(body);
 
-  if (
+    if (
     payload.status !== 'ready' ||
     payload.database !== 'connected' ||
-    payload.redis !== 'connected'
+    payload.redis !== 'connected' ||
+    payload.ai?.provider !== expectedAIProvider ||
+    payload.ai?.model !== expectedAIModel ||
+    payload.ai?.configured !== true
   ) {
     throw new Error(`Unexpected API readiness payload: ${body}`);
   }
 });
 
-console.log('PASS API readiness confirms database and Redis through Nginx');
+console.log('PASS API readiness confirms database, Redis, and AI configuration through Nginx');
 
 await assertSocketProxy();
 console.log('PASS Socket.IO WebSocket upgrade reaches API authentication through Nginx');
